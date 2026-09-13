@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PocketBloom — เกมจัดการเงิน</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="desktop-frame">
+      <div class="browser-chrome" aria-hidden="true">
+        <div class="chrome-tab"><span class="peach-dot">✦</span><strong>POCKET.BLOOM</strong><span class="tab-close">×</span></div>
+        <div class="chrome-add">＋</div>
+        <div class="chrome-window-controls"><i></i><i></i><i></i></div>
+      </div>
+      <div class="menu-strip" aria-hidden="true"><span>FILE</span><span>EDIT</span><span>VIEW</span><span>STICKERS</span><span>QUEST</span><span>MAGIC</span></div>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="#dashboard" aria-label="PayFlow หน้าหลัก">
+          <span class="brand-mark">♡</span>
+          <span>Pocket<span>Bloom</span></span>
+        </a>
+
+        <nav class="main-nav" aria-label="เมนูหลัก">
+          <button class="nav-item active" data-page="dashboard"><span>▦</span> ภาพรวม</button>
+          <button class="nav-item" data-page="transactions"><span>↕</span> รายการทั้งหมด</button>
+          <button class="nav-item" data-page="installments"><span>◫</span> รายการผ่อนชำระ</button>
+          <button class="nav-item" data-page="notes"><span>✎</span> บันทึกความจำ</button>
+        </nav>
+
+        <div class="sidebar-bottom">
+          <div class="safe-card">
+            <span class="safe-icon">⌁</span>
+            <div><strong>ข้อมูลของคุณปลอดภัย</strong><small>บันทึกไว้ในอุปกรณ์นี้</small></div>
+          </div>
+          <div class="profile"><span class="avatar">พ</span><div><strong>พิมพ์ชนก</strong><small>บัญชีส่วนตัว</small></div><span class="more">•••</span></div>
+        </div>
+      </aside>
+
+      <main class="content">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow" id="page-kicker">สรุปการเงินของคุณ</p>
+            <h1 id="page-title">ภาพรวม</h1>
+          </div>
+          <div class="header-actions">
+            <div class="pet-widget" title="เพื่อนร่วมวางแผนการเงิน"><span>◕ᴗ◕</span><div><small>วันนี้เก่งมาก!</small><strong>+10 ดอกไม้</strong></div></div>
+            <div class="month-picker" aria-label="เลือกเดือน"><button type="button" data-month-direction="-1" title="เดือนก่อนหน้า">‹</button><strong id="current-month">กันยายน 2569</strong><button type="button" data-month-direction="1" title="เดือนถัดไป">›</button></div>
+            <button class="button primary" id="open-transaction"><span>＋</span> เพิ่มรายการ</button>
+          </div>
+        </header>
+
+        <section class="page active" id="dashboard-page">
+          <section class="summary-grid" aria-label="สรุปยอดเดือนนี้">
+            <article class="summary-card balance-card">
+              <div class="card-head"><span>คงเหลือเดือนนี้</span><span class="icon-box">◒</span></div>
+              <strong class="money" id="balance-total">฿0</strong>
+              <p id="balance-note">รายรับมากกว่ารายจ่าย</p><span class="level-chip">✦ Bloom level 04</span>
+            </article>
+            <article class="summary-card income-card">
+              <div class="card-head"><span>รายรับ</span><span class="icon-box">↙</span></div>
+              <strong class="money" id="income-total">฿0</strong>
+              <p>รวมรายรับของเดือนนี้</p>
+            </article>
+            <article class="summary-card expense-card">
+              <div class="card-head"><span>รายจ่าย</span><span class="icon-box">↗</span></div>
+              <strong class="money" id="expense-total">฿0</strong>
+              <p><span id="installment-in-expense">฿0</span> จากรายการผ่อนชำระ</p>
+            </article>
+          </section>
+
+          <section class="dashboard-grid">
+            <article class="panel spending-panel">
+              <div class="panel-heading"><div><h2>ค่าใช้จ่ายตามหมวดหมู่</h2><p>รายจ่ายของเดือนที่เลือก</p></div><button class="text-button" data-page-link="transactions">ดูทั้งหมด</button></div>
+              <div class="category-content">
+                <div class="donut-wrap"><div class="donut" id="category-donut"><div class="donut-center"><strong id="donut-total">฿0</strong><small>รายจ่ายรวม</small></div></div></div>
+                <div class="legend" id="category-legend"></div>
+              </div>
+            </article>
+
+            <article class="panel budget-panel">
+              <div class="panel-heading"><div><h2>ภาพรวมกระแสเงินสด</h2><p>รายรับเทียบกับรายจ่าย</p></div><span class="mini-label">เดือนนี้</span></div>
+              <div class="bar-comparison">
+                <div><div class="bar-label"><span>รายรับ</span><strong id="chart-income">฿0</strong></div><div class="bar-track"><i class="income-bar" id="income-bar"></i></div></div>
+                <div><div class="bar-label"><span>รายจ่าย</span><strong id="chart-expense">฿0</strong></div><div class="bar-track"><i class="expense-bar" id="expense-bar"></i></div></div>
+              </div>
+              <div class="insight" id="cashflow-insight"></div>
+            </article>
+          </section>
+
+          <section class="quest-strip" aria-label="ภารกิจประจำเดือน">
+            <div class="quest-character">(◕ᴗ◕) <i>✿</i></div>
+            <div><span class="quest-label">MINI QUEST</span><h2>บันทึกรายจ่ายให้ครบ 7 วัน</h2><p>ทุกครั้งที่จดบันทึก คือการดูแลอนาคตของเรา</p></div>
+            <div class="quest-progress"><span id="quest-days">0 / 7 วัน</span><div><i id="quest-bar" style="width:0%"></i></div></div>
+            <button class="quest-reward" type="button" title="ของรางวัลรออยู่">🎁</button>
+          </section>
+
+          <section class="panel month-transactions">
+            <div class="panel-heading"><div><h2>รายการในเดือนนี้</h2><p id="monthly-list-subtitle">รายรับและรายจ่ายที่บันทึกไว้</p></div><button class="text-button" data-page-link="transactions">ดูทั้งหมด</button></div>
+            <div class="transaction-list" id="monthly-transactions"></div>
+          </section>
+        </section>
+
+        <section class="page" id="transactions-page">
+          <section class="tx-summary-strip" aria-label="สรุปยอดรายการ">
+            <article class="tx-sum-card tx-sum-income">
+              <div class="tx-sum-icon">↙</div>
+              <div><span>รายรับ</span><strong id="tx-sum-income">฿0</strong></div>
+            </article>
+            <article class="tx-sum-card tx-sum-expense">
+              <div class="tx-sum-icon">↗</div>
+              <div><span>รายจ่าย</span><strong id="tx-sum-expense">฿0</strong></div>
+            </article>
+            <article class="tx-sum-card tx-sum-balance">
+              <div class="tx-sum-icon">◒</div>
+              <div><span>คงเหลือ</span><strong id="tx-sum-balance">฿0</strong></div>
+            </article>
+            <article class="tx-sum-card tx-sum-count">
+              <div class="tx-sum-icon">≡</div>
+              <div><span>จำนวนรายการ</span><strong id="tx-sum-count">0 รายการ</strong></div>
+            </article>
+          </section>
+          <section class="panel full-panel">
+            <div class="panel-heading"><div><h2>รายการทั้งหมด</h2><p>รายการที่เกิดขึ้นในเดือนที่เลือก รวมรายการผ่อนอัตโนมัติ</p></div><button class="button primary small" id="open-transaction-secondary">＋ เพิ่มรายการ</button></div>
+            <div class="filter-row"><button class="filter active" data-filter="all">ทั้งหมด</button><button class="filter" data-filter="income">รายรับ</button><button class="filter" data-filter="expense">รายจ่าย</button></div>
+            <div class="transaction-list expanded" id="all-transactions"></div>
+          </section>
+        </section>
+
+        <section class="page" id="installments-page">
+          <section class="installment-header">
+            <div><p class="eyebrow">ติดตามภาระผ่อนชำระ</p><h2>รายการผ่อนชำระ</h2><p>ยอดของแต่ละงวดจะถูกเพิ่มในรายจ่ายรายเดือนโดยอัตโนมัติ</p></div>
+            <button class="button primary" id="open-installment">＋ เพิ่มรายการผ่อน</button>
+          </section>
+          <section class="installment-summary" id="installment-summary"></section>
+          <section class="installment-grid" id="installment-list"></section>
+        </section>
+
+        <section class="page" id="notes-page">
+          <section class="notes-header">
+            <div><p class="eyebrow">พื้นที่บันทึกส่วนตัว</p><h2>บันทึกความจำ</h2><p>จดสิ่งที่อยากจำ เช่น กำหนดชำระ เป้าหมาย หรือเรื่องสำคัญไว้ในที่เดียว</p></div>
+            <button class="button primary" id="open-note">＋ เพิ่มบันทึก</button>
+          </section>
+          <section class="notes-grid" id="notes-list"></section>
+        </section>
+      </main>
+    </div>
+    </div>
+
+    <div class="modal-backdrop" id="transaction-modal" aria-hidden="true">
+      <form class="modal" id="transaction-form">
+        <div class="modal-title"><div><p class="eyebrow">บันทึกรายการ</p><h2 id="tx-modal-title">เพิ่มรายรับหรือรายจ่าย</h2></div><button type="button" class="close" data-close="transaction-modal">×</button></div>
+        <label>ประเภทรายการ <div class="segmented"><input type="radio" name="transactionType" value="expense" id="type-expense" checked><label for="type-expense">รายจ่าย</label><input type="radio" name="transactionType" value="income" id="type-income"><label for="type-income">รายรับ</label></div></label>
+        <div class="form-grid"><label>ชื่อรายการ<input required name="title" placeholder="เช่น ค่าอาหาร" maxlength="48" /></label><label>จำนวนเงิน<input required name="amount" type="number" min="1" step="1" placeholder="0" inputmode="decimal" /></label><label>หมวดหมู่<select name="category" id="transaction-category"></select></label><label>วันที่<input required name="date" id="transaction-date" type="date" /></label></div>
+        <label>หมายเหตุ <textarea name="note" placeholder="เพิ่มรายละเอียด (ไม่บังคับ)" maxlength="100"></textarea></label>
+        <div class="modal-actions"><button type="button" class="button ghost" data-close="transaction-modal">ยกเลิก</button><button class="button primary" id="tx-submit-btn" type="submit">บันทึกรายการ</button></div>
+      </form>
+    </div>
+
+    <div class="modal-backdrop" id="installment-modal" aria-hidden="true">
+      <form class="modal" id="installment-form">
+        <div class="modal-title"><div><p class="eyebrow">ตั้งค่ารายการผ่อน</p><h2>เพิ่มรายการผ่อนชำระ</h2></div><button type="button" class="close" data-close="installment-modal">×</button></div>
+        <div class="form-grid"><label>ชื่อรายการ<input required name="title" placeholder="เช่น ผ่อนโทรศัพท์" maxlength="48" /></label><label>ยอดผ่อนต่องวด<input required name="amount" type="number" min="1" step="1" placeholder="700" inputmode="decimal" /></label><label>จำนวนงวดทั้งหมด<input required name="months" type="number" min="1" max="120" step="1" value="12" /></label><label>ผ่อนแล้วกี่งวด<input required name="paidCount" type="number" min="0" max="120" step="1" value="0" /></label><label>เริ่มผ่อนเดือน<input required name="startMonth" id="installment-start" type="month" /></label><label>หมวดหมู่<select name="category" id="installment-category"></select></label></div>
+        <div class="auto-note"><span>✓</span><p>รายการเดิมสามารถกรอกจำนวนงวดที่ผ่อนไปแล้วเพื่อบันทึกย้อนหลังได้ ระบบจะแสดงยอดคงเหลือให้ทันที และยังรวมค่าใช้จ่ายตามเดือนที่เลือกเหมือนเดิม</p></div>
+        <div class="modal-actions"><button type="button" class="button ghost" data-close="installment-modal">ยกเลิก</button><button class="button primary" type="submit">สร้างรายการผ่อน</button></div>
+      </form>
+    </div>
+
+    <div class="modal-backdrop" id="payment-modal" aria-hidden="true">
+      <form class="modal" id="payment-form">
+        <input type="hidden" name="id" id="payment-item-id" />
+        <div class="modal-title"><div><p class="eyebrow">อัปเดตสถานะการผ่อน</p><h2>บันทึกยอดที่ชำระแล้ว</h2></div><button type="button" class="close" data-close="payment-modal">×</button></div>
+        <div class="payment-preview" id="payment-preview"></div>
+        <label>จำนวนงวดที่ชำระแล้ว<input required name="paidCount" id="payment-paid-count" type="number" min="0" max="120" step="1" /></label>
+        <p class="form-hint">ระบุจำนวนงวดรวมที่ชำระไปแล้ว เช่น ผ่อนครบ 3 งวด ให้กรอก 3</p>
+        <div class="modal-actions"><button type="button" class="button ghost" data-close="payment-modal">ยกเลิก</button><button class="button primary" type="submit">บันทึกยอดชำระ</button></div>
+      </form>
+    </div>
+
+    <div class="modal-backdrop" id="note-modal" aria-hidden="true">
+      <form class="modal" id="note-form">
+        <div class="modal-title"><div><p class="eyebrow">บันทึกส่วนตัว</p><h2>เพิ่มบันทึกความจำ</h2></div><button type="button" class="close" data-close="note-modal">×</button></div>
+        <label>หัวข้อ<input required name="title" placeholder="เช่น เตรียมเงินจ่ายบัตรเครดิต" maxlength="60" /></label>
+        <label>รายละเอียด<textarea required name="content" placeholder="เขียนสิ่งที่อยากจดจำ..." maxlength="500"></textarea></label>
+        <label>วันที่เกี่ยวข้อง <input name="date" id="note-date" type="date" /></label>
+        <div class="modal-actions"><button type="button" class="button ghost" data-close="note-modal">ยกเลิก</button><button class="button primary" type="submit">บันทึกความจำ</button></div>
+      </form>
+    </div>
+
+    <div class="toast" id="toast" role="status"></div>
+
+    <!-- Mobile bottom navigation -->
+    <nav class="mobile-nav" aria-label="เมนูมือถือ">
+      <button class="nav-item active" data-page="dashboard"><span>▦</span><small>ภาพรวม</small></button>
+      <button class="nav-item" data-page="transactions"><span>↕</span><small>รายการ</small></button>
+      <button class="nav-item" data-page="installments"><span>◫</span><small>ผ่อนชำระ</small></button>
+      <button class="nav-item" data-page="notes"><span>✎</span><small>บันทึก</small></button>
+    </nav>
+
+    <!-- ═══ AUTH MODAL ═══════════════════════════════════════ -->
+    <div class="modal-backdrop" id="auth-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
+      <div class="modal" style="max-width:420px">
+        <div class="modal-header">
+          <h2 id="auth-modal-title">เข้าสู่ระบบ PocketBloom</h2>
+          <small style="color:var(--text-muted)">ข้อมูลของคุณจะถูกบันทึกบน Cloud อย่างปลอดภัย</small>
+        </div>
+        <div class="modal-body">
+          <!-- Tab switcher -->
+          <div style="display:flex;gap:8px;margin-bottom:20px">
+            <button id="auth-tab-login"  class="filter active" style="flex:1;padding:10px" onclick="authSwitchTab('login')">เข้าสู่ระบบ</button>
+            <button id="auth-tab-signup" class="filter"        style="flex:1;padding:10px" onclick="authSwitchTab('signup')">สมัครสมาชิก</button>
+          </div>
+
+          <form id="auth-form" autocomplete="on">
+            <div class="form-group" id="auth-name-group" style="display:none">
+              <label for="auth-name">ชื่อแสดงผล</label>
+              <input type="text" id="auth-name" name="displayName" placeholder="เช่น พิมพ์ชนก" autocomplete="name" />
+            </div>
+            <div class="form-group">
+              <label for="auth-email">อีเมล</label>
+              <input type="email" id="auth-email" name="email" required placeholder="you@example.com" autocomplete="email" />
+            </div>
+            <div class="form-group">
+              <label for="auth-password">รหัสผ่าน</label>
+              <input type="password" id="auth-password" name="password" required minlength="6" placeholder="อย่างน้อย 6 ตัวอักษร" autocomplete="current-password" />
+            </div>
+            <p id="auth-error" style="color:#e5738a;font-size:13px;margin:0 0 12px;display:none"></p>
+            <button class="button primary" type="submit" id="auth-submit-btn" style="width:100%;justify-content:center">เข้าสู่ระบบ</button>
+          </form>
+
+          <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);text-align:center">
+            <small style="color:var(--text-muted)">หรือ <a href="#" id="auth-offline-link" style="color:var(--accent-primary)" onclick="useOfflineMode(event)">ใช้งานแบบ Offline (ไม่บันทึก Cloud)</a></small>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- ════════════════════════════════════════════════════════ -->
+
+    <!-- Supabase Anon Key Config (replace with your actual key) -->
+    <script>
+      window.__SUPABASE_ANON_KEY__ = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ6ZHJud3pyZWZ5aGNsd3ZpaXV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3NzI0MDAsImV4cCI6MjA1MjM0ODQwMH0.REPLACE_WITH_ACTUAL_ANON_KEY";
+    </script>
+    <script src="supabase.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
