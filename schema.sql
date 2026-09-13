@@ -87,16 +87,10 @@ CREATE POLICY "Users update own notes" ON public.notes FOR UPDATE USING (auth.ui
 CREATE POLICY "Users delete own notes" ON public.notes FOR DELETE USING (auth.uid() = user_id);
 
 -- ─── INDEXES ─────────────────────────────────────────────────
--- Composite index: user + date descending (handles all monthly range queries)
+-- (user_id, date DESC) รองรับทุก query ตามเดือนด้วย range scan
 CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON public.transactions(user_id, date DESC);
--- Year+Month via EXTRACT — both are IMMUTABLE on DATE columns
-CREATE INDEX IF NOT EXISTS idx_transactions_user_ym ON public.transactions(
-  user_id,
-  EXTRACT(YEAR  FROM date)::INTEGER,
-  EXTRACT(MONTH FROM date)::INTEGER
-);
-CREATE INDEX IF NOT EXISTS idx_installments_user ON public.installments(user_id);
-CREATE INDEX IF NOT EXISTS idx_notes_user ON public.notes(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_installments_user      ON public.installments(user_id);
+CREATE INDEX IF NOT EXISTS idx_notes_user             ON public.notes(user_id, created_at DESC);
 
 -- ─── REALTIME ─────────────────────────────────────────────────
 -- Enable Realtime for these tables in Supabase Dashboard:
