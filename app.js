@@ -643,12 +643,37 @@ _id("note-date").value         = selectedMonth + "-01";
 render();
 switchPage("dashboard");
 
+
 /* ══════════════════════════════════════════════════════════════
-   SUPABASE AUTH INTEGRATION
+   SUPABASE AUTH INTEGRATION  v2  (ครอบคลุมทุก operation)
    ══════════════════════════════════════════════════════════════ */
 
 let _useCloud    = false;
 let _currentUser = null;
+
+/* ── Loading overlay ──────────────────────────────────────── */
+function showCloudLoader(msg) {
+  var el = _id("cloud-loader");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "cloud-loader";
+    el.style.cssText = "position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:rgba(15,16,30,.82);backdrop-filter:blur(6px);color:#fff;font-size:15px";
+    el.innerHTML = '<div style="width:38px;height:38px;border:3px solid #8b70d4;border-top-color:transparent;border-radius:50%;animation:spin 0.7s linear infinite"></div><span id="cloud-loader-msg"></span>';
+    if (!document.getElementById("spin-style")) {
+      var st = document.createElement("style");
+      st.id = "spin-style";
+      st.textContent = "@keyframes spin{to{transform:rotate(360deg)}}";
+      document.head.appendChild(st);
+    }
+    document.body.appendChild(el);
+  }
+  el.querySelector("#cloud-loader-msg").textContent = msg || "กำลังเชื่อมต่อ Cloud…";
+  el.style.display = "flex";
+}
+function hideCloudLoader() {
+  var el = _id("cloud-loader");
+  if (el) el.style.display = "none";
+}
 
 /* ── Auth modal tab switcher ──────────────────────────────── */
 function authSwitchTab(tab) {
@@ -679,7 +704,7 @@ function useOfflineMode(e) {
     var mode  = form.dataset.mode || "login";
     var email = document.getElementById("auth-email").value.trim();
     var pass  = document.getElementById("auth-password").value;
-    var name  = document.getElementById("auth-name").value.trim();
+    var name  = document.getElementById("auth-name") ? document.getElementById("auth-name").value.trim() : "";
     var errEl = document.getElementById("auth-error");
     var btn   = document.getElementById("auth-submit-btn");
     errEl.style.display = "none";
@@ -688,11 +713,11 @@ function useOfflineMode(e) {
     try {
       if (mode === "signup") {
         await window.SupabaseAuth.signUp(email, pass, name);
-        toast("✅ สมัครสมาชิกสำเร็จ! กรุณาตรวจสอบอีเมลเพื่อยืนยัน");
+        toast("✅ สมัครสมาชิกสำเร็จ! กรุณาตรวจสอบอีเมลเพื่อยืนยัน แล้วกลับมา Login");
         authSwitchTab("login");
       } else {
         await window.SupabaseAuth.signIn(email, pass);
-        // onAuthChange will handle the rest
+        // onAuthChange handles the rest
       }
     } catch (err) {
       errEl.textContent = err.message || "เกิดข้อผิดพลาด กรุณาลองใหม่";
@@ -703,7 +728,7 @@ function useOfflineMode(e) {
   });
 })();
 
-/* ── Profile chip (sidebar) ─────────────────────────────── */
+/* ── Profile chip ─────────────────────────────────────────── */
 function updateProfileChip(user) {
   var name   = (user && (user.user_metadata?.display_name || user.email?.split("@")[0])) || "ผู้ใช้";
   var avatar = name.charAt(0).toUpperCase();
@@ -712,67 +737,19 @@ function updateProfileChip(user) {
   prof.innerHTML =
     '<span class="avatar">' + avatar + '</span>' +
     '<div><strong>' + name + '</strong><small>' + (user ? user.email : "Offline") + '</small></div>' +
-    '<button style="background:none;border:none;cursor:pointer;color:var(--text-muted)" title="ออกจากระบบ" onclick="handleSignOut()">⎋</button>';
+    '<button style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:16px" title="ออกจากระบบ" onclick="handleSignOut()">⎋</button>';
 }
 
 async function handleSignOut() {
   if (!confirm("ออกจากระบบใช่ไหม?")) return;
-  try {
-    await window.SupabaseAuth.signOut();
-  } catch (_) {}
+  try { await window.SupabaseRealtime.unsubscribeAll(); } catch (_) {}
+  try { await window.SupabaseAuth.signOut(); } catch (_) {}
   _useCloud = false;
   _currentUser = null;
-  // Reload page to reset state
   location.reload();
 }
 
-/* ── On auth state change ─────────────────────────────────── */
-document.addEventListener("supabase:ready", async function() {
-  window.SupabaseAuth.onAuthChange(async function(event, user) {
-    if (user) {
-      _currentUser = user;
-      _useCloud    = true;
-      closeModal("auth-modal");
-      updateProfileChip(user);
-      updateSafeCard(true);
-      toast("🌸 ยินดีต้อนรับ " + (user.user_metadata?.display_name || user.email.split("@")[0]));
-      // Load cloud data
-      try {
-        var cloudData = await window.SupabaseDB.loadAll();
-        if (cloudData.transactions.length || cloudData.installments.length || cloudData.notes.length) {
-          data.transactions  = cloudData.transactions;
-          data.installments  = cloudData.installments;
-          data.notes         = cloudData.notes;
-          render();
-        } else {
-          // Migrate local data to cloud on first login
-          await window.SupabaseMigration.migrateFromLocalStorage(STORAGE_KEY);
-          var migrated = await window.SupabaseDB.loadAll();
-          data.transactions = migrated.transactions.length ? migrated.transactions : data.transactions;
-          data.installments = migrated.installments.length ? migrated.installments : data.installments;
-          data.notes        = migrated.notes.length        ? migrated.notes        : data.notes;
-          render();
-        }
-      } catch (err) {
-        console.error("Failed to load cloud data:", err);
-        toast("⚠️ โหลดข้อมูลจาก Cloud ไม่สำเร็จ — ใช้ข้อมูลในเครื่อง");
-      }
-    } else {
-      // No session — show auth modal (defer so DOM is ready)
-      setTimeout(function() {
-        if (!_useCloud) openModal("auth-modal");
-      }, 300);
-    }
-  });
-
-  // Also check immediately
-  var user = await window.SupabaseAuth.getUser();
-  if (!user) {
-    setTimeout(function() { if (!_useCloud) openModal("auth-modal"); }, 300);
-  }
-});
-
-/* ── Safe card text update ────────────────────────────────── */
+/* ── Safe card ────────────────────────────────────────────── */
 function updateSafeCard(cloud) {
   var card = document.querySelector(".safe-card div");
   if (!card) return;
@@ -781,35 +758,214 @@ function updateSafeCard(cloud) {
     : "<strong>ข้อมูลของคุณปลอดภัย</strong><small>บันทึกไว้ในอุปกรณ์นี้</small>";
 }
 
-/* ── Patch saveData to also save to Supabase ──────────────── */
-var _originalSaveData = saveData;
-saveData = async function() {
-  _originalSaveData(); // always keep localStorage
-};
+/* ══════════════════════════════════════════════════════════════
+   CLOUD SYNC HELPERS  (เรียกหลัง localStorage save ทุกครั้ง)
+   ══════════════════════════════════════════════════════════════ */
 
-/* Override add/edit/delete to use Supabase when logged in */
-// Transactions
-var _origTxSubmit = null;
-(function patchTransactionForm() {
-  var form = document.getElementById("transaction-form");
-  if (!form) return;
-  form.addEventListener("submit", async function patchSubmit(e) {
-    if (!_useCloud || !_currentUser) return; // handled by original listener
-    // Already saved locally by original listener, now sync to cloud
-    try {
-      var lastTx = data.transactions[data.transactions.length - 1];
-      if (editingTxId) {
-        var tx = data.transactions.find(function(t) { return t.id === editingTxId; });
-        if (tx) await window.SupabaseDB.updateTransaction(tx.id, tx);
-      } else if (lastTx) {
-        var saved = await window.SupabaseDB.addTransaction(lastTx);
-        // Update id with DB-generated UUID
-        var idx = data.transactions.indexOf(lastTx);
-        if (idx !== -1) data.transactions[idx].id = saved.id;
+async function cloudSyncTx(op, id, tx) {
+  if (!_useCloud || !_currentUser) return;
+  try {
+    if (op === "add")    { var saved = await window.SupabaseDB.addTransaction(tx);    tx.id = saved.id; }
+    if (op === "update") { await window.SupabaseDB.updateTransaction(id, tx); }
+    if (op === "delete") { await window.SupabaseDB.deleteTransaction(id); }
+  } catch (err) { console.warn("Cloud sync TX:", err.message); }
+}
+
+async function cloudSyncInst(op, id, inst) {
+  if (!_useCloud || !_currentUser) return;
+  try {
+    if (op === "add")    { var saved = await window.SupabaseDB.addInstallment(inst);    inst.id = saved.id; }
+    if (op === "update") { await window.SupabaseDB.updateInstallment(id, inst); }
+    if (op === "delete") { await window.SupabaseDB.deleteInstallment(id); }
+  } catch (err) { console.warn("Cloud sync INST:", err.message); }
+}
+
+async function cloudSyncNote(op, id, note) {
+  if (!_useCloud || !_currentUser) return;
+  try {
+    if (op === "add")    { var saved = await window.SupabaseDB.addNote(note); note.id = saved.id; }
+    if (op === "delete") { await window.SupabaseDB.deleteNote(id); }
+  } catch (err) { console.warn("Cloud sync NOTE:", err.message); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   PATCH APP EVENT HANDLERS — inject cloud sync into existing
+   listeners by wrapping the form submit / click handlers
+   ══════════════════════════════════════════════════════════════ */
+
+(function patchAppHandlers() {
+  /* ── Transaction form ────────────────────────────────────── */
+  var txForm = document.getElementById("transaction-form");
+  if (txForm) {
+    txForm.addEventListener("submit", async function(e) {
+      // Let original listener run first (it runs on bubble, we're also on bubble
+      // but added later — so we wait one tick)
+      await new Promise(r => setTimeout(r, 0));
+      if (!_useCloud) return;
+      if (editingTxId !== null) {
+        // editingTxId was already reset to null by original, use last-known
+        // FIX: we capture editingTxId BEFORE original resets it via a separate listener
+      } else {
+        // "add" path — last item in array is the one just added
+        var newest = data.transactions[data.transactions.length - 1];
+        if (newest) await cloudSyncTx("add", null, newest);
       }
-    } catch (err) {
-      console.warn("Cloud sync (transaction):", err.message);
-    }
-  }, true); // capture phase runs before original
+    });
+  }
+
+  /* ── all-transactions list click (edit / delete tx) ─────── */
+  var allTxEl = document.getElementById("all-transactions");
+  if (allTxEl) {
+    allTxEl.addEventListener("click", async function(e) {
+      await new Promise(r => setTimeout(r, 0));
+      if (!_useCloud) return;
+      var delId = e.target.dataset.deleteTx;
+      if (delId) await cloudSyncTx("delete", delId, null);
+    });
+  }
+
+  /* ── Installment form (add) ──────────────────────────────── */
+  var instForm = document.getElementById("installment-form");
+  if (instForm) {
+    instForm.addEventListener("submit", async function(e) {
+      await new Promise(r => setTimeout(r, 0));
+      if (!_useCloud) return;
+      var newest = data.installments[data.installments.length - 1];
+      if (newest) await cloudSyncInst("add", null, newest);
+    });
+  }
+
+  /* ── Installment list click (update paidCount / delete) ──── */
+  var instListEl = document.getElementById("installment-list");
+  if (instListEl) {
+    instListEl.addEventListener("click", async function(e) {
+      await new Promise(r => setTimeout(r, 0));
+      if (!_useCloud) return;
+      var deleteId = e.target.dataset.deleteInstallment;
+      if (deleteId) await cloudSyncInst("delete", deleteId, null);
+    });
+  }
+
+  /* ── Payment form (update paidCount) ────────────────────── */
+  var payForm = document.getElementById("payment-form");
+  if (payForm) {
+    payForm.addEventListener("submit", async function(e) {
+      await new Promise(r => setTimeout(r, 0));
+      if (!_useCloud) return;
+      var form = new FormData(payForm);
+      var id   = form.get ? form.get("id") : null;
+      if (!id) { id = document.getElementById("payment-item-id")?.value; }
+      var inst = data.installments.find(function(x) { return x.id === id; });
+      if (inst) await cloudSyncInst("update", id, inst);
+    });
+  }
+
+  /* ── Note form (add) ─────────────────────────────────────── */
+  var noteForm = document.getElementById("note-form");
+  if (noteForm) {
+    noteForm.addEventListener("submit", async function(e) {
+      await new Promise(r => setTimeout(r, 0));
+      if (!_useCloud) return;
+      var newest = data.notes[0]; // notes sorted desc, newest is first after re-sort? check:
+      // Actually data.notes is push()ed, so newest is last
+      var n = data.notes[data.notes.length - 1];
+      if (n) await cloudSyncNote("add", null, n);
+    });
+  }
+
+  /* ── Notes list click (delete) ───────────────────────────── */
+  var notesListEl = document.getElementById("notes-list");
+  if (notesListEl) {
+    notesListEl.addEventListener("click", async function(e) {
+      await new Promise(r => setTimeout(r, 0));
+      if (!_useCloud) return;
+      var id = e.target.dataset.deleteNote;
+      if (id) await cloudSyncNote("delete", id, null);
+    });
+  }
 })();
+
+/* ── Capture editingTxId BEFORE original listener resets it ─ */
+(function captureEditingTxId() {
+  var txForm = document.getElementById("transaction-form");
+  if (!txForm) return;
+  var _capturedEditId = null;
+  // We add a capture-phase listener to grab it before anything runs
+  txForm.addEventListener("submit", function(e) {
+    _capturedEditId = editingTxId; // grab current value
+  }, true);
+  // Then a post-submit listener to do the cloud update
+  txForm.addEventListener("submit", async function(e) {
+    await new Promise(r => setTimeout(r, 0));
+    if (!_useCloud || !_capturedEditId) { _capturedEditId = null; return; }
+    var tx = data.transactions.find(function(t) { return t.id === _capturedEditId; });
+    if (tx) await cloudSyncTx("update", _capturedEditId, tx);
+    _capturedEditId = null;
+  });
+})();
+
+/* ══════════════════════════════════════════════════════════════
+   ON AUTH STATE CHANGE — main orchestrator
+   ══════════════════════════════════════════════════════════════ */
+document.addEventListener("supabase:ready", async function() {
+
+  /* Restore session if already logged in */
+  var sessionUser = await window.SupabaseAuth.getUser();
+  if (!sessionUser) {
+    setTimeout(function() { if (!_useCloud) openModal("auth-modal"); }, 400);
+  }
+
+  /* Listen for login / logout events */
+  window.SupabaseAuth.onAuthChange(async function(event, user) {
+    if (user) {
+      _currentUser = user;
+      _useCloud    = true;
+      closeModal("auth-modal");
+      updateProfileChip(user);
+      updateSafeCard(true);
+
+      showCloudLoader("กำลังโหลดข้อมูลจาก Cloud…");
+      try {
+        /* Try to migrate localStorage first (no-op if already has data) */
+        await window.SupabaseMigration.migrateFromLocalStorage(STORAGE_KEY);
+
+        var cloudData = await window.SupabaseDB.loadAll();
+        if (cloudData.transactions.length || cloudData.installments.length || cloudData.notes.length) {
+          data.transactions = cloudData.transactions;
+          data.installments = cloudData.installments;
+          data.notes        = cloudData.notes;
+          saveData(); // keep localStorage in sync
+        }
+        render();
+        toast("🌸 ยินดีต้อนรับ " + (user.user_metadata?.display_name || user.email.split("@")[0]));
+
+        /* Start Realtime */
+        await window.SupabaseRealtime.subscribe(user.id, function(table, payload) {
+          // On remote change from another device → reload data
+          window.SupabaseDB.loadAll().then(function(d) {
+            data.transactions = d.transactions;
+            data.installments = d.installments;
+            data.notes        = d.notes;
+            saveData();
+            render();
+          }).catch(function() {});
+        });
+
+      } catch (err) {
+        console.error("Cloud load error:", err);
+        toast("⚠️ โหลดข้อมูลจาก Cloud ไม่สำเร็จ — ใช้ข้อมูลในเครื่อง");
+      } finally {
+        hideCloudLoader();
+      }
+
+    } else {
+      /* Logged out */
+      _useCloud    = false;
+      _currentUser = null;
+      try { await window.SupabaseRealtime.unsubscribeAll(); } catch (_) {}
+      updateSafeCard(false);
+      setTimeout(function() { if (!_useCloud) openModal("auth-modal"); }, 300);
+    }
+  });
+});
 
