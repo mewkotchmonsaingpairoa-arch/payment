@@ -69,25 +69,9 @@ function emptyMarkup(text) {
 }
 function _id(id) { return document.getElementById(id); }
 
-/* ─── Default data (uses current month) ─────────────────────── */
+/* ─── Empty data (new users start clean) ─────────────────── */
 function defaultData() {
-  var cm = selectedMonth;
-  return {
-    transactions: [
-      { id: "tx1", type: "income",  title: "เงินเดือน",  amount: 32000, category: "salary",   date: cm + "-01", note: "" },
-      { id: "tx2", type: "expense", title: "ค่าอาหาร",   amount: 1850,  category: "food",      date: cm + "-04", note: "" },
-      { id: "tx3", type: "expense", title: "ค่าเดินทาง", amount: 1200,  category: "transport", date: cm + "-06", note: "" },
-      { id: "tx4", type: "expense", title: "ค่าไฟฟ้า",   amount: 980,   category: "bills",     date: cm + "-08", note: "" },
-      { id: "tx5", type: "expense", title: "ช้อปปิ้ง",   amount: 1460,  category: "shopping",  date: cm + "-10", note: "" }
-    ],
-    installments: [
-      { id: "ins1", title: "ผ่อนโทรศัพท์มือถือ", amount: 700,  months: 12, paidCount: 2, startMonth: incrementMonth(cm, -2), category: "installment" },
-      { id: "ins2", title: "ประกันชีวิต",         amount: 1250, months: 10, paidCount: 1, startMonth: incrementMonth(cm, -1), category: "bills" }
-    ],
-    notes: [
-      { id: "note1", title: "กันเงินสำหรับค่าใช้จ่ายฉุกเฉิน", content: "ตั้งเป้าเก็บเงินสำรองอย่างน้อย 3,000 บาทภายในสิ้นเดือน", date: cm + "-30", createdAt: new Date().toISOString() }
-    ]
-  };
+  return { transactions: [], installments: [], notes: [] };
 }
 
 /* ─── Storage ────────────────────────────────────────────────── */
@@ -105,6 +89,7 @@ function loadData() {
   return defaultData();
 }
 function saveData() {
+  if (typeof _useCloud !== "undefined" && _useCloud && _currentUser) return;   /* cloud is source of truth */
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
   catch (e) { console.warn("Could not save data:", e); }
 }

@@ -69,18 +69,30 @@ ALTER TABLE public.installments  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notes         ENABLE ROW LEVEL SECURITY;
 
 -- Transactions policies
+DROP POLICY IF EXISTS "Users read own transactions"   ON public.transactions;
+DROP POLICY IF EXISTS "Users insert own transactions" ON public.transactions;
+DROP POLICY IF EXISTS "Users update own transactions" ON public.transactions;
+DROP POLICY IF EXISTS "Users delete own transactions" ON public.transactions;
 CREATE POLICY "Users read own transactions"   ON public.transactions FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users insert own transactions" ON public.transactions FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users update own transactions" ON public.transactions FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "Users delete own transactions" ON public.transactions FOR DELETE USING (auth.uid() = user_id);
 
 -- Installments policies
+DROP POLICY IF EXISTS "Users read own installments"   ON public.installments;
+DROP POLICY IF EXISTS "Users insert own installments" ON public.installments;
+DROP POLICY IF EXISTS "Users update own installments" ON public.installments;
+DROP POLICY IF EXISTS "Users delete own installments" ON public.installments;
 CREATE POLICY "Users read own installments"   ON public.installments FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users insert own installments" ON public.installments FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users update own installments" ON public.installments FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "Users delete own installments" ON public.installments FOR DELETE USING (auth.uid() = user_id);
 
 -- Notes policies
+DROP POLICY IF EXISTS "Users read own notes"   ON public.notes;
+DROP POLICY IF EXISTS "Users insert own notes" ON public.notes;
+DROP POLICY IF EXISTS "Users update own notes" ON public.notes;
+DROP POLICY IF EXISTS "Users delete own notes" ON public.notes;
 CREATE POLICY "Users read own notes"   ON public.notes FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users insert own notes" ON public.notes FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users update own notes" ON public.notes FOR UPDATE USING (auth.uid() = user_id);
@@ -92,11 +104,17 @@ CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON public.transactions(use
 CREATE INDEX IF NOT EXISTS idx_installments_user      ON public.installments(user_id);
 CREATE INDEX IF NOT EXISTS idx_notes_user             ON public.notes(user_id, created_at DESC);
 
--- ─── REALTIME ─────────────────────────────────────────────────
--- Enable Realtime for these tables in Supabase Dashboard:
--- Table Editor → <table> → Realtime (toggle ON)
--- Or run:
-ALTER PUBLICATION supabase_realtime ADD TABLE public.transactions;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.installments;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.notes;
-
+-- ─── REALTIME ───────────────────────────────────────────
+-- Enable Realtime for these tables (safe to re-run; ignore
+-- "already member of publication" errors if they appear)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname='supabase_realtime' AND tablename='transactions') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.transactions;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname='supabase_realtime' AND tablename='installments') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.installments;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname='supabase_realtime' AND tablename='notes') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.notes;
+  END IF;
+END $$;

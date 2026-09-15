@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PocketBloom — DB Test</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f101e; color: #e8ecf3; min-height: 100vh; padding: 24px;
+    }
+    h1 { font-size: 22px; margin-bottom: 4px; color: #c4b5fd; }
+    .subtitle { font-size: 13px; color: #8b94a5; margin-bottom: 24px; }
+    .card { background: #1a1b2e; border: 1px solid #2a2b45; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+    .card h2 { font-size: 14px; color: #a78bfa; margin-bottom: 12px; letter-spacing: .05em; text-transform: uppercase; }
+    .status-row { display: flex; align-items: center; gap: 10px; font-size: 14px; margin-bottom: 8px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: #8b94a5; flex-shrink: 0; }
+    .dot.green  { background: #4ade80; box-shadow: 0 0 8px #4ade8088; }
+    .dot.red    { background: #f87171; box-shadow: 0 0 8px #f8717188; }
+    .dot.yellow { background: #fbbf24; box-shadow: 0 0 8px #fbbf2488; }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    button { padding: 9px 18px; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; transition: opacity .15s; }
+    button:hover { opacity: .85; } button:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-primary { background: #7c3aed; color: #fff; }
+    .btn-danger  { background: #dc2626; color: #fff; }
+    .btn-ghost   { background: #2a2b45; color: #c4b5fd; }
+    #log { background: #0a0b14; border: 1px solid #1e1f35; border-radius: 8px; padding: 14px; font-family: "SF Mono","Fira Code",monospace; font-size: 12px; line-height: 1.7; max-height: 420px; overflow-y: auto; margin-top: 12px; }
+    .log-ok   { color: #4ade80; } .log-err  { color: #f87171; } .log-info { color: #93c5fd; }
+    .log-warn { color: #fbbf24; } .log-dim  { color: #4b5163; } .log-data { color: #c4b5fd; }
+    .auth-section label { display: block; font-size: 13px; color: #8b94a5; margin-bottom: 4px; }
+    .auth-section input { width: 100%; padding: 9px 12px; background: #0f101e; border: 1px solid #2a2b45; border-radius: 8px; color: #e8ecf3; font-size: 14px; margin-bottom: 10px; }
+    .auth-section input:focus { outline: none; border-color: #7c3aed; }
+    .result-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+    .result-table th { background: #0a0b14; color: #a78bfa; text-align: left; padding: 6px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+    .result-table td { padding: 6px 10px; border-top: 1px solid #1e1f35; color: #c4b5fd; }
+    .result-table tr:hover td { background: #1e1f35; }
+  </style>
+</head>
+<body>
+  <h1>🌸 PocketBloom — DB Test Panel</h1>
+  <p class="subtitle">ทดสอบ Supabase connection · insert · select · delete</p>
+
+  <div class="card">
+    <h2>Connection Status</h2>
+    <div class="status-row"><span class="dot" id="dot-sdk"></span><span id="status-sdk">รอโหลด Supabase SDK…</span></div>
+    <div class="status-row"><span class="dot" id="dot-auth"></span><span id="status-auth">ยังไม่ได้ Login</span></div>
+    <div class="status-row"><span class="dot" id="dot-db"></span><span id="status-db">ยังไม่ได้เชื่อมต่อ DB</span></div>
+  </div>
+
+  <div class="card auth-section">
+    <h2>Login</h2>
+    <label>Email</label><input type="email" id="email" placeholder="your@email.com" />
+    <label>Password</label><input type="password" id="password" placeholder="รหัสผ่าน" />
+    <div class="btn-row">
+      <button class="btn-primary" id="btn-login" onclick="doLogin()">เข้าสู่ระบบ</button>
+      <button class="btn-ghost" id="btn-signup" onclick="doSignup()">สมัครสมาชิก</button>
+      <button class="btn-ghost" id="btn-logout" onclick="doLogout()" disabled>ออกจากระบบ</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>DB Test Operations</h2>
+    <div class="btn-row">
+      <button class="btn-primary" onclick="testInsertTransaction()">▶ Insert Transaction</button>
+      <button class="btn-primary" onclick="testInsertInstallment()">▶ Insert Installment</button>
+      <button class="btn-primary" onclick="testInsertNote()">▶ Insert Note</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn-ghost" onclick="testSelectAll()">📋 Select All</button>
+      <button class="btn-danger" onclick="testDeleteAll()">🗑 Delete Test Records</button>
+      <button class="btn-ghost" onclick="clearLog()">✕ Clear Log</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Log</h2>
+    <div id="log"><span class="log-dim">รอดำเนินการ…</span></div>
+  </div>
+
+  <div class="card" id="results-card" style="display:none">
+    <h2>Records ใน Database</h2>
+    <div id="results-body"></div>
+  </div>
+
+  <script>
+    const SUPABASE_URL  = "https://bzdrnwzrefyhclwviiuz.supabase.co";
+    const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ6ZHJud3pyZWZ5aGNsd3ZpaXV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyNTkwOTIsImV4cCI6MjEwNDgzNTA5Mn0.aTBpr70YviJXiB1SwpwA0F6vKmi3RAID8kJ6e1PUZjo";
+
+    let _client = null;
+    let _insertedIds = { transactions: [], installments: [], notes: [] };
+
+    function log(msg, cls) {
+      const el = document.getElementById("log");
+      const line = document.createElement("div");
+      const ts = new Date().toLocaleTimeString("th-TH");
+      line.className = cls || "log-info";
+      line.innerHTML = '<span class="log-dim">[' + ts + ']</span> ' + msg;
+      if (el.firstChild && el.firstChild.className === "log-dim") el.innerHTML = "";
+      el.appendChild(line);
+      el.scrollTop = el.scrollHeight;
+    }
+    function clearLog() { document.getElementById("log").innerHTML = '<span class="log-dim">Log cleared…</span>'; }
+    function setStatus(id, dotId, cls, text) {
+      document.getElementById(id).textContent = text;
+      document.getElementById(dotId).className = "dot " + cls;
+    }
+
+    (function loadSDK() {
+      const s = document.createElement("script");
+      s.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js";
+      s.onload = function() {
+        _client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+        setStatus("status-sdk", "dot-sdk", "green", "SDK โหลดสำเร็จ — " + SUPABASE_URL);
+        log("Supabase SDK โหลดสำเร็จ", "log-ok");
+        checkSession();
+      };
+      s.onerror = function() {
+        setStatus("status-sdk", "dot-sdk", "red", "โหลด SDK ไม่สำเร็จ");
+        log("โหลด Supabase SDK ไม่สำเร็จ — ตรวจสอบ internet", "log-err");
+      };
+      document.head.appendChild(s);
+      log("กำลังโหลด Supabase SDK…", "log-info");
+    })();
+
+    async function checkSession() {
+      try {
+        const { data: { user } } = await _client.auth.getUser();
+        if (user) onLoggedIn(user);
+        else { setStatus("status-auth","dot-auth","yellow","ยังไม่ได้ Login"); log("ยังไม่มี session — กรุณา Login ก่อน","log-warn"); }
+      } catch(e) { log("checkSession error: " + e.message, "log-err"); }
+    }
+
+    function onLoggedIn(user) {
+      setStatus("status-auth","dot-auth","green","Login แล้ว: " + user.email);
+      setStatus("status-db","dot-db","green","พร้อมใช้งาน DB");
+      log("Login สำเร็จ — user_id: " + user.id, "log-ok");
+      document.getElementById("btn-logout").disabled = false;
+      document.getElementById("btn-login").disabled = true;
+      document.getElementById("btn-signup").disabled = true;
+    }
+
+    async function doLogin() {
+      const email = document.getElementById("email").value.trim();
+      const pass  = document.getElementById("password").value;
+      if (!email || !pass) { log("กรอก email และ password ก่อน","log-warn"); return; }
+      log("กำลัง Login…", "log-info");
+      try {
+        const { data, error } = await _client.auth.signInWithPassword({ email, password: pass });
+        if (error) throw error;
+        onLoggedIn(data.user);
+      } catch(e) { setStatus("status-auth","dot-auth","red","Login ไม่สำเร็จ"); log("Login error: " + e.message,"log-err"); }
+    }
+
+    async function doSignup() {
+      const email = document.getElementById("email").value.trim();
+      const pass  = document.getElementById("password").value;
+      if (!email || !pass) { log("กรอก email และ password ก่อน","log-warn"); return; }
+      log("กำลังสมัครสมาชิก…","log-info");
+      try {
+        const { data, error } = await _client.auth.signUp({ email, password: pass });
+        if (error) throw error;
+        log("สมัครสมาชิกสำเร็จ! ตรวจสอบอีเมลเพื่อยืนยัน (หรือปิด email confirm ใน Supabase Dashboard)", "log-ok");
+      } catch(e) { log("Signup error: " + e.message,"log-err"); }
+    }
+
+    async function doLogout() {
+      await _client.auth.signOut();
+      setStatus("status-auth","dot-auth","yellow","ออกจากระบบแล้ว");
+      setStatus("status-db","dot-db","","ไม่ได้เชื่อมต่อ");
+      document.getElementById("btn-logout").disabled = true;
+      document.getElementById("btn-login").disabled = false;
+      document.getElementById("btn-signup").disabled = false;
+      log("ออกจากระบบแล้ว","log-warn");
+    }
+
+    async function getUser() {
+      const { data: { user } } = await _client.auth.getUser();
+      if (!user) throw new Error("ยังไม่ได้ Login");
+      return user;
+    }
+
+    async function testInsertTransaction() {
+      log("▶ [transactions] กำลัง INSERT…","log-info");
+      try {
+        const user = await getUser();
+        const payload = { user_id: user.id, type: "expense", title: "Test DB — ค่าอาหาร", amount: 99.50, category: "food", date: new Date().toISOString().split("T")[0], note: "auto-generated test" };
+        log("  payload: " + JSON.stringify(payload),"log-dim");
+        const { data, error } = await _client.from("transactions").insert([payload]).select().single();
+        if (error) throw error;
+        _insertedIds.transactions.push(data.id);
+        log("INSERT transactions สำเร็จ! id=" + data.id,"log-ok");
+        log("  title=" + data.title + "  amount=" + data.amount + "  date=" + data.date,"log-data");
+      } catch(e) { log("INSERT transactions error: " + e.message,"log-err"); if(e.hint) log("  hint: "+e.hint,"log-err"); }
+    }
+
+    async function testInsertInstallment() {
+      log("▶ [installments] กำลัง INSERT…","log-info");
+      try {
+        const user = await getUser();
+        const now = new Date();
+        const startMonth = now.getFullYear() + "-" + String(now.getMonth()+1).padStart(2,"0");
+        const payload = { user_id: user.id, title: "Test DB — ผ่อนโทรศัพท์", amount: 1500, months: 24, paid_count: 3, start_month: startMonth, category: "shopping" };
+        log("  payload: " + JSON.stringify(payload),"log-dim");
+        const { data, error } = await _client.from("installments").insert([payload]).select().single();
+        if (error) throw error;
+        _insertedIds.installments.push(data.id);
+        log("INSERT installments สำเร็จ! id=" + data.id,"log-ok");
+        log("  title=" + data.title + "  " + data.paid_count + "/" + data.months + " งวด","log-data");
+      } catch(e) { log("INSERT installments error: " + e.message,"log-err"); if(e.hint) log("  hint: "+e.hint,"log-err"); }
+    }
+
+    async function testInsertNote() {
+      log("▶ [notes] กำลัง INSERT…","log-info");
+      try {
+        const user = await getUser();
+        const payload = { user_id: user.id, title: "Test DB — บันทึกทดสอบ", content: "บันทึก record นี้สร้างโดย db_test.html", date: new Date().toISOString().split("T")[0] };
+        log("  payload: " + JSON.stringify(payload),"log-dim");
+        const { data, error } = await _client.from("notes").insert([payload]).select().single();
+        if (error) throw error;
+        _insertedIds.notes.push(data.id);
+        log("INSERT notes สำเร็จ! id=" + data.id,"log-ok");
+      } catch(e) { log("INSERT notes error: " + e.message,"log-err"); if(e.hint) log("  hint: "+e.hint,"log-err"); }
+    }
+
+    async function testSelectAll() {
+      log("▶ SELECT ทั้งหมดจาก DB…","log-info");
+      try {
+        const user = await getUser();
+        const [tx, inst, note] = await Promise.all([
+          _client.from("transactions").select("*").eq("user_id",user.id).order("date",{ascending:false}),
+          _client.from("installments").select("*").eq("user_id",user.id).order("created_at",{ascending:false}),
+          _client.from("notes").select("*").eq("user_id",user.id).order("created_at",{ascending:false})
+        ]);
+        if (tx.error)   throw new Error("[transactions] "+tx.error.message);
+        if (inst.error) throw new Error("[installments] "+inst.error.message);
+        if (note.error) throw new Error("[notes] "+note.error.message);
+        log("SELECT สำเร็จ!","log-ok");
+        log("  transactions: "+(tx.data||[]).length+" records","log-data");
+        log("  installments: "+(inst.data||[]).length+" records","log-data");
+        log("  notes: "+(note.data||[]).length+" records","log-data");
+        renderResults(tx.data, inst.data, note.data);
+      } catch(e) { log("SELECT error: "+e.message,"log-err"); }
+    }
+
+    async function testDeleteAll() {
+      log("▶ ลบ test records ที่ insert ไว้ใน session นี้…","log-warn");
+      try {
+        const user = await getUser();
+        let deleted = 0;
+        for (const id of _insertedIds.transactions) {
+          const { error } = await _client.from("transactions").delete().eq("id",id).eq("user_id",user.id);
+          if (!error) { deleted++; log("  ลบ transaction: "+id,"log-ok"); } else log("  error: "+error.message,"log-err");
+        }
+        for (const id of _insertedIds.installments) {
+          const { error } = await _client.from("installments").delete().eq("id",id).eq("user_id",user.id);
+          if (!error) { deleted++; log("  ลบ installment: "+id,"log-ok"); } else log("  error: "+error.message,"log-err");
+        }
+        for (const id of _insertedIds.notes) {
+          const { error } = await _client.from("notes").delete().eq("id",id).eq("user_id",user.id);
+          if (!error) { deleted++; log("  ลบ note: "+id,"log-ok"); } else log("  error: "+error.message,"log-err");
+        }
+        _insertedIds = { transactions: [], installments: [], notes: [] };
+        log("ลบ test records เรียบร้อย — "+deleted+" records","log-ok");
+      } catch(e) { log("Delete error: "+e.message,"log-err"); }
+    }
+
+    function renderResults(txs, insts, notes) {
+      document.getElementById("results-card").style.display = "";
+      let html = "";
+      if (txs && txs.length) {
+        html += "<h3 style='color:#a78bfa;font-size:13px;margin:0 0 6px;text-transform:uppercase'>Transactions ("+txs.length+")</h3>";
+        html += "<table class='result-table'><thead><tr><th>ID</th><th>Title</th><th>Type</th><th>Amount</th><th>Date</th></tr></thead><tbody>";
+        txs.forEach(function(r){ html += "<tr><td title='"+r.id+"'>"+r.id.slice(0,8)+"…</td><td>"+r.title+"</td><td>"+r.type+"</td><td>฿"+r.amount+"</td><td>"+r.date+"</td></tr>"; });
+        html += "</tbody></table><br>";
+      } else html += "<p style='color:#8b94a5;font-size:13px;margin-bottom:12px'>ไม่มี transaction</p>";
+
+      if (insts && insts.length) {
+        html += "<h3 style='color:#a78bfa;font-size:13px;margin:0 0 6px;text-transform:uppercase'>Installments ("+insts.length+")</h3>";
+        html += "<table class='result-table'><thead><tr><th>ID</th><th>Title</th><th>Amount</th><th>Months</th><th>Paid</th><th>Start</th></tr></thead><tbody>";
+        insts.forEach(function(r){ html += "<tr><td title='"+r.id+"'>"+r.id.slice(0,8)+"…</td><td>"+r.title+"</td><td>฿"+r.amount+"</td><td>"+r.months+"</td><td>"+r.paid_count+"</td><td>"+r.start_month+"</td></tr>"; });
+        html += "</tbody></table><br>";
+      } else html += "<p style='color:#8b94a5;font-size:13px;margin-bottom:12px'>ไม่มี installment</p>";
+
+      if (notes && notes.length) {
+        html += "<h3 style='color:#a78bfa;font-size:13px;margin:0 0 6px;text-transform:uppercase'>Notes ("+notes.length+")</h3>";
+        html += "<table class='result-table'><thead><tr><th>ID</th><th>Title</th><th>Content</th><th>Date</th></tr></thead><tbody>";
+        notes.forEach(function(r){ html += "<tr><td title='"+r.id+"'>"+r.id.slice(0,8)+"…</td><td>"+r.title+"</td><td>"+r.content.slice(0,60)+"</td><td>"+(r.date||"—")+"</td></tr>"; });
+        html += "</tbody></table>";
+      } else html += "<p style='color:#8b94a5;font-size:13px'>ไม่มี note</p>";
+
+      document.getElementById("results-body").innerHTML = html;
+    }
+  </script>
+</body>
+</html>
