@@ -62,13 +62,24 @@ npx serve .
 - **RLS Policies** คุ้มครองทุก query
 - **Auth.users** ผ่าน Supabase JWT
 - **Anon Key** ปลอดภัย — ถูก restrict ด้วย RLS
+- **reCAPTCHA v3** ป้องกัน bot สมัคร/ล็อกอิน (ดูด้านล่าง)
+
+### 🤖 ตั้งค่า reCAPTCHA v3
+
+- **Site key** (`window.__RECAPTCHA_SITE_KEY__` ใน `index.html`) — ใช้ในฝั่ง client ได้ปกติ ระบบจะ execute แบบ invisible ทุกครั้งที่ login/signup (action: `auth`)
+- **Secret key** — ⚠️ ห้ามใส่ในโค้ดฝั่ง client เด็ดขาด ใช้ verify ฝั่ง server เท่านั้น:
+  ```
+  POST https://www.google.com/recaptcha/api/siteverify
+  secret=<SECRET_KEY>&response=<TOKEN>
+  ```
+  หมายเหตุ: Supabase Auth รองรับ captcha ฝั่ง server เฉพาะ hCaptcha/Turnstile — token reCAPTCHA v3 จึงถูก enforce ที่ client + ตรวจ score ผ่าน backend ของคุณเองหากต้องการ
 
 ## 🛠️ Supabase Backend API
 
 ```js
-// Auth
-await SupabaseAuth.signUp(email, password, displayName)
-await SupabaseAuth.signIn(email, password)
+// Auth (captchaToken = token จาก reCAPTCHA)
+await SupabaseAuth.signUp(email, password, displayName, captchaToken)
+await SupabaseAuth.signIn(email, password, captchaToken)
 await SupabaseAuth.signOut()
 await SupabaseAuth.getUser()
 

@@ -694,6 +694,36 @@ function useOfflineMode(e) {
   toast("ใช้งานแบบ Offline — ข้อมูลจะบันทึกในอุปกรณ์นี้เท่านั้น");
 }
 
+/* ── reCAPTCHA v3 (score-based, invisible) ────────────────── */
+var RECAPTCHA_ACTION = "auth";
+
+function recaptchaToken() {
+  return new Promise(function(resolve) {
+    if (!window.grecaptcha || !window.__RECAPTCHA_SITE_KEY__) { resolve(null); return; }
+    try {
+      grecaptcha.ready(function() {
+        grecaptcha.execute(window.__RECAPTCHA_SITE_KEY__, { action: RECAPTCHA_ACTION })
+          .then(function(token) { resolve(token || null); })
+          .catch(function(err) { console.error("reCAPTCHA:", err); resolve(null); });
+      });
+    } catch (err) { console.error("reCAPTCHA:", err); resolve(null); }
+  });
+}
+
+/* ── Friendly Thai error messages ─────────────────────────── */
+function authErrorThai(err) {
+  var msg = (err && err.message) || "";
+  var code = (err && (err.code || err.error_code)) || "";
+  if (msg.indexOf("Invalid API key") !== -1 || msg.indexOf("Invalid login credentials") !== -1) {
+    return "อีเมลหรือรหัสผ่านไม่ถูกต้อง (หรือยังไม่ได้ยืนยันอีเมล)";
+  }
+  if (msg.indexOf("Email not confirmed") !== -1) return "กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ (ตรวจสอบกล่องจดหมาย)";
+  if (msg.indexOf("already registered") !== -1) return "อีเมลนี้สมัครสมาชิกไว้แล้ว ลองเข้าสู่ระบบแทน";
+  if (msg.indexOf("rate limit") !== -1) return "พยายามหลายครั้งเกินไป กรุณารอสักครู่แล้วลองใหม่";
+  if (code === "user_banned") return "บัญชีนี้ถูกระงับการใช้งาน";
+  return msg || "เกิดข้อผิดพลาด กรุณาลองใหม่";
+}
+
 /* ── Auth form submit ─────────────────────────────────────── */
 (function wireAuthForm() {
   var form = document.getElementById("auth-form");
@@ -708,19 +738,28 @@ function useOfflineMode(e) {
     var errEl = document.getElementById("auth-error");
     var btn   = document.getElementById("auth-submit-btn");
     errEl.style.display = "none";
+
+    /* reCAPTCHA v3 — token is generated invisibly */
+    var captchaToken = await recaptchaToken();
+    if (!captchaToken) {
+      errEl.textContent = "ระบบตรวจสอบความปลอดภัยไม่สำเร็จ กรุณาลองใหม่อีกครั้ง";
+      errEl.style.display = "";
+      return;
+    }
+
     btn.disabled = true;
     btn.textContent = "กำลังดำเนินการ…";
     try {
       if (mode === "signup") {
-        await window.SupabaseAuth.signUp(email, pass, name);
+        await window.SupabaseAuth.signUp(email, pass, name, captchaToken);
         toast("✅ สมัครสมาชิกสำเร็จ! กรุณาตรวจสอบอีเมลเพื่อยืนยัน แล้วกลับมา Login");
         authSwitchTab("login");
       } else {
-        await window.SupabaseAuth.signIn(email, pass);
+        await window.SupabaseAuth.signIn(email, pass, captchaToken);
         // onAuthChange handles the rest
       }
     } catch (err) {
-      errEl.textContent = err.message || "เกิดข้อผิดพลาด กรุณาลองใหม่";
+      errEl.textContent = authErrorThai(err);
       errEl.style.display = "";
     }
     btn.disabled = false;

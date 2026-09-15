@@ -43,18 +43,21 @@ function getClient() {
    AUTH
    ══════════════════════════════════════════════════════════════ */
 const SupabaseAuth = {
-  async signUp(email, password, displayName) {
+  async signUp(email, password, displayName, captchaToken) {
     const c = await getClient();
     const { data, error } = await c.auth.signUp({
       email, password,
-      options: { data: { display_name: displayName || email.split("@")[0] } }
+      options: {
+        data: { display_name: displayName || email.split("@")[0] },
+        captchaToken
+      }
     });
     if (error) throw error;
     return data;
   },
-  async signIn(email, password) {
+  async signIn(email, password, captchaToken) {
     const c = await getClient();
-    const { data, error } = await c.auth.signInWithPassword({ email, password });
+    const { data, error } = await c.auth.signInWithPassword({ email, password, captchaToken });
     if (error) throw error;
     return data;
   },

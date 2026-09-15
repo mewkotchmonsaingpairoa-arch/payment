@@ -3,6 +3,9 @@
 .env.local
 *.key
 
+# Freebuff workspace metadata
+.freebuff/
+
 # OS
 .DS_Store
 Thumbs.db
