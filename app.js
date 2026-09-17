@@ -588,11 +588,11 @@ document.querySelectorAll('input[name="transactionType"]').forEach(function(radi
   radio.addEventListener("change", function(e) { populateCategories(txCategoryEl, e.target.value); });
 });
 
-/* Filter buttons */
-document.querySelectorAll(".filter").forEach(function(btn) {
+/* Filter buttons — scoped to transactions page only */
+document.querySelectorAll("#transactions-page .filter[data-filter]").forEach(function(btn) {
   btn.addEventListener("click", function() {
     txFilter = btn.dataset.filter;
-    document.querySelectorAll(".filter").forEach(function(x) {
+    document.querySelectorAll("#transactions-page .filter[data-filter]").forEach(function(x) {
       x.classList.toggle("active", x === btn);
     });
     renderAllTransactions();
