@@ -381,3 +381,51 @@ body::before { animation: sparkle-drift 6s ease-in-out infinite; } body::after {
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+
+/* ─── Mobile profile / login buttons ───────────────────────── */
+/* Topbar button (hidden on desktop, shown on mobile) */
+.mobile-profile-btn {
+  display: none;
+}
+@media (max-width: 620px) {
+  .mobile-profile-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 2px solid #e9cce4;
+    background: linear-gradient(145deg, #f3a1c8, #b68bdd);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    flex: 0 0 auto;
+    transition: transform .15s, box-shadow .15s;
+    box-shadow: 2px 2px 0 #e4c2d7;
+  }
+  .mobile-profile-btn:hover { transform: scale(1.1); }
+  .mobile-profile-btn.mobile-profile-active {
+    background: linear-gradient(145deg, #5db89a, #3e9d7d);
+    border-color: #c4ead8;
+  }
+}
+
+/* Bottom nav account button states */
+#mobile-account-btn { color: #b08aaa; }
+#mobile-account-btn.mobile-account-active {
+  color: #3e9d7d !important;
+}
+#mobile-account-btn.mobile-account-active > span {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #5db89a, #3e9d7d);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  margin: 0 auto;
+}

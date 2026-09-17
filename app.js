@@ -1079,7 +1079,53 @@ function updateProfileChip(user) {
   /* Show signout button */
   var btnEl = _id("signout-btn");
   if (btnEl) btnEl.style.display = "";
+
+  /* ── Update mobile profile buttons ── */
+  /* topbar button */
+  var mobAvatar = _id("mobile-avatar");
+  if (mobAvatar) mobAvatar.textContent = user ? avatar : "♡";
+  /* bottom nav button */
+  var mobNavAvatar = _id("mobile-nav-avatar");
+  var mobNavLabel  = _id("mobile-nav-label");
+  if (mobNavAvatar) mobNavAvatar.textContent = user ? avatar : "⊙";
+  if (mobNavLabel)  mobNavLabel.textContent  = user ? name.split(" ")[0] : "เข้าสู่ระบบ";
+  /* Style: highlight if logged in */
+  var mobAccountBtn = _id("mobile-account-btn");
+  if (mobAccountBtn) mobAccountBtn.classList.toggle("mobile-account-active", !!user);
+  var mobProfileBtn = _id("mobile-profile-btn");
+  if (mobProfileBtn) mobProfileBtn.classList.toggle("mobile-profile-active", !!user);
 }
+
+/* ── Mobile account buttons wiring ──────────────────────── */
+(function wireMobileAccountButtons() {
+  /* Bottom nav account button */
+  var mobBtn = _id("mobile-account-btn");
+  if (mobBtn) {
+    mobBtn.addEventListener("click", function() {
+      if (_currentUser) {
+        /* Already logged in → ask to sign out */
+        if (confirm("ออกจากระบบ (" + (_currentUser.email || "") + ") ใช่ไหม?")) {
+          handleSignOut();
+        }
+      } else {
+        openModal("auth-modal");
+      }
+    });
+  }
+  /* Topbar profile button */
+  var mobProfileBtn = _id("mobile-profile-btn");
+  if (mobProfileBtn) {
+    mobProfileBtn.addEventListener("click", function() {
+      if (_currentUser) {
+        if (confirm("ออกจากระบบ (" + (_currentUser.email || "") + ") ใช่ไหม?")) {
+          handleSignOut();
+        }
+      } else {
+        openModal("auth-modal");
+      }
+    });
+  }
+})();
 
 async function handleSignOut() {
   if (!confirm("ออกจากระบบใช่ไหม?")) return;

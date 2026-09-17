@@ -54,6 +54,8 @@
             <div class="pet-widget" title="เพื่อนร่วมวางแผนการเงิน"><span>◕ᴗ◕</span><div><small>วันนี้เก่งมาก!</small><strong>+10 ดอกไม้</strong></div></div>
             <div class="month-picker" aria-label="เลือกเดือน"><button type="button" data-month-direction="-1" title="เดือนก่อนหน้า">‹</button><strong id="current-month">กันยายน 2569</strong><button type="button" data-month-direction="1" title="เดือนถัดไป">›</button></div>
             <button class="button primary" id="open-transaction"><span>＋</span> เพิ่มรายการ</button>
+            <!-- Mobile-only profile/login button -->
+            <button class="mobile-profile-btn" id="mobile-profile-btn" title="บัญชีผู้ใช้"><span id="mobile-avatar">?</span></button>
           </div>
         </header>
 
@@ -255,6 +257,7 @@
       <button class="nav-item" data-page="transactions"><span>↕</span><small>รายการ</small></button>
       <button class="nav-item" data-page="installments"><span>◫</span><small>ผ่อนชำระ</small></button>
       <button class="nav-item" data-page="notes"><span>✎</span><small>บันทึก</small></button>
+      <button class="nav-item" id="mobile-account-btn" title="บัญชีผู้ใช้"><span id="mobile-nav-avatar">◌</span><small id="mobile-nav-label">เข้าสู่ระบบ</small></button>
     </nav>
 
     <!-- ═══ AUTH MODAL ═══════════════════════════════════════ -->
