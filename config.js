@@ -1,0 +1,3 @@
+/* PocketBloom — App Config (CSP-safe external file) */
+window.__SUPABASE_ANON_KEY__ = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ6ZHJud3pyZWZ5aGNsd3ZpaXV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyNTkwOTIsImV4cCI6MjEwNDgzNTA5Mn0.aTBpr70YviJXiB1SwpwA0F6vKmi3RAID8kJ6e1PUZjo";
+window.__RECAPTCHA_SITE_KEY__ = "6LcsULwtAAAAAP_oSzYAcO6EKUnFqP88ljv7pSTc";

@@ -91,7 +91,7 @@ h2 { font-size: 17px; letter-spacing: -.25px; margin: 0; }
 .empty { text-align: center; color: #8c95a6; padding: 42px 12px; font-size: 13px; }.empty span { font-size: 28px; display: block; margin-bottom: 8px; }
 
 .installment-header { display: flex; justify-content: space-between; align-items: center; background: linear-gradient(110deg, #f1f3ff, #fbfcff); border: 1px solid #e1e6fd; padding: 24px; border-radius: 11px; margin-bottom: 17px; }.installment-header h2 { font-size: 22px; }.installment-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 18px; }.installment-metric { padding: 17px 19px; background: #fff; border: 1px solid var(--line); border-radius: 10px; }.installment-metric span { color: var(--muted); font-size: 11px; }.installment-metric strong { display: block; margin-top: 6px; font-size: 21px; }.installment-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }.installment-card { background: #fff; border: 1px solid var(--line); border-radius: 11px; padding: 19px; }.installment-card-top { display: flex; justify-content: space-between; gap: 12px; }.installment-card-title { display: flex; align-items: center; gap: 9px; }.installment-card-title h3 { font-size: 14px; margin: 0; }.installment-card-title small { color: #7e889a; font-size: 10px; }.pill { color: #188c69; font-size: 10px; padding: 4px 7px; background: #e9f8f1; border-radius: 12px; font-weight: 700; white-space: nowrap; }.installment-price { display: flex; justify-content: space-between; align-items: end; margin: 19px 0 12px; }.installment-price strong { font-size: 20px; }.installment-price span { color: #7b8598; font-size: 11px; }.progress { height: 7px; border-radius: 5px; background: #edf0f4; overflow: hidden; }.progress i { display: block; height: 100%; background: var(--blue); border-radius: inherit; }.installment-meta { display: flex; justify-content: space-between; margin-top: 8px; color: #7d8798; font-size: 10px; }.installment-card-foot { border-top: 1px solid #f0f1f4; margin-top: 15px; padding-top: 11px; display: flex; justify-content: space-between; align-items: center; color: #68738b; font-size: 10px; }.delete-link { color: #d56565; background: transparent; padding: 0; border: 0; font-size: 10px; }
-.notes-header { display: flex; justify-content: space-between; align-items: center; background: linear-gradient(110deg, #fff8eb, #fffdf9); border: 1px solid #f2e3c7; padding: 24px; border-radius: 11px; margin-bottom: 17px; }.notes-header h2 { font-size: 22px; }.notes-header > div > p:last-child { color: var(--muted); font-size: 11px; margin: 5px 0 0; }.notes-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }.note-card { background: #fffdf6; border: 1px solid #f0e6d4; border-radius: 11px; padding: 18px; min-height: 180px; display: flex; flex-direction: column; }.note-card-top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }.note-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: #fff0ce; color: #b67b1f; font-size: 16px; }.note-card h3 { margin: 14px 0 7px; font-size: 14px; }.note-card p { color: #6e7481; font-size: 11px; line-height: 1.65; white-space: pre-wrap; margin: 0; }.note-card-foot { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f1e8dc; margin-top: auto; padding-top: 12px; color: #8b8170; font-size: 10px; }.note-card .delete-link { color: #ca7165; }
+.notes-header { display: flex; justify-content: space-between; align-items: center; background: linear-gradient(110deg, #fff8eb, #fffdf9); border: 1px solid #f2e3c7; padding: 24px; border-radius: 11px; margin-bottom: 17px; }.notes-header h2 { font-size: 22px; }.notes-header > div > p:last-child { color: var(--muted); font-size: 11px; margin: 5px 0 0; }.notes-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }.note-card { background: #fffdf6; border: 1px solid #f0e6d4; border-radius: 11px; padding: 18px; min-height: 180px; display: flex; flex-direction: column; }.note-card-top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }.note-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: #fff0ce; color: #b67b1f; font-size: 16px; }.note-card h3 { margin: 14px 0 7px; font-size: 14px; }.note-card p { color: #6e7481; font-size: 11px; line-height: 1.65; white-space: pre-wrap; margin: 0; }.note-card-foot { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f1e8dc; margin-top: auto; padding-top: 12px; color: #8b8170; font-size: 10px; }.note-card .delete-link { color: #ca7165; }.note-card-actions { display: flex; gap: 4px; align-items: center; }.note-card-actions .tx-edit-btn { font-size: 13px; color: #9a68b5; }.note-card-actions .delete-link { color: #ca7165; font-size: 11px; }
 
 .modal-backdrop { position: fixed; inset: 0; z-index: 10; background: #5e3f765c; display: none; place-items: center; padding: 20px; backdrop-filter: blur(4px); }.modal-backdrop.open { display: grid; }.modal { width: min(100%, 570px); max-height: calc(100vh - 40px); overflow: auto; background: #fffafd; padding: 25px; border-radius: 24px; border: 2px solid #fff; box-shadow: 0 18px 46px #9d6ea141; }.modal-title { display: flex; justify-content: space-between; margin-bottom: 21px; }.modal-title h2 { font-size: 20px; }.close { color: #a36792; background: #ffe7f2; width: 32px; height: 32px; border: 0; border-radius: 50%; font-size: 21px; line-height: 1; }.modal label { display: block; color: #75546f; font-weight: 700; font-size: 11px; }.modal input:not([type="radio"]), .modal select, .modal textarea { width: 100%; border: 1.5px solid #eed8e8; color: #5c3d5c; border-radius: 13px; outline-color: #ca75ba; padding: 9px 10px; background: #fff; font-size: 13px; margin: 6px 0 14px; }.modal textarea { min-height: 67px; resize: vertical; }.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }.segmented { display: flex; padding: 3px; gap: 3px; background: #fae9f5; border-radius: 12px; margin: 6px 0 14px; }.segmented input { position: absolute; opacity: 0; }.segmented label { flex: 1; cursor: pointer; padding: 7px; color: #9a7893; text-align: center; font-size: 12px; border-radius: 9px; }.segmented input:checked + label { color: #7a3d77; background: #fff; box-shadow: 0 2px 5px #c28ab632; }.modal-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 8px; }.auto-note { display: flex; gap: 8px; padding: 11px; border-radius: 13px; background: #f2e9ff; color: #796189; font-size: 11px; line-height: 1.5; }.auto-note span { color: #ad65ad; font-weight: bold; }.auto-note p { margin: 0; }.toast { opacity: 0; pointer-events: none; transform: translateY(8px); position: fixed; z-index: 15; bottom: 24px; left: 50%; translate: -50% 0; background: linear-gradient(115deg, #c15fae, #8d6ed0); color: white; padding: 11px 16px; border-radius: 16px; font-size: 12px; box-shadow: 0 7px 18px #9b5aa03d; transition: .2s; }.toast.show { opacity: 1; transform: translateY(0); }
 
@@ -322,4 +322,62 @@ body::before { animation: sparkle-drift 6s ease-in-out infinite; } body::after {
   .tx-sum-card { padding: 12px 13px; gap: 10px; }
   .tx-sum-card strong { font-size: 15px; }
   .tx-sum-icon { width: 34px; height: 34px; font-size: 16px; border-radius: 10px; }
+}
+
+/* ─── Sidebar manage-categories button ─────────────────────── */
+.btn-manage-cat-sidebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 13px;
+  border: 1.5px dashed #d9b8ef;
+  border-radius: 13px;
+  background: linear-gradient(110deg, #f9eeff, #fde9f7);
+  color: #9a5db0;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  margin-bottom: 10px;
+  transition: background .15s, transform .15s, box-shadow .15s;
+  text-align: left;
+}
+.btn-manage-cat-sidebar span { font-size: 15px; }
+.btn-manage-cat-sidebar:hover {
+  background: linear-gradient(110deg, #ead0ff, #fad4ef);
+  transform: translateY(-1px);
+  box-shadow: 2px 3px 0 #e2c0d7;
+}
+@media (max-width: 900px) {
+  .btn-manage-cat-sidebar > span:last-child { display: none; }
+  .btn-manage-cat-sidebar { justify-content: center; padding: 9px 8px; }
+}
+@media (max-width: 620px) { .btn-manage-cat-sidebar { display: none; } }
+
+/* ─── Installment calc preview card ────────────────────────── */
+.inst-calc-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  background: linear-gradient(110deg, #f3eaff, #fff0fa);
+  border: 1.5px solid #d9b8ef;
+  border-radius: 14px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+}
+.inst-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #8b6a8a;
+}
+.inst-preview-row strong { color: #6a3f6a; font-size: 13px; }
+.inst-preview-row.highlight strong {
+  color: #9a3d8a;
+  font-size: 15px;
+  background: linear-gradient(110deg, #e67dba, #a57ed2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }

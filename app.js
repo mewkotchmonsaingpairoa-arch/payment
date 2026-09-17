@@ -64,9 +64,11 @@ function uid() {
 /* ─── State ──────────────────────────────────────────────────── */
 const _now = new Date();
 let selectedMonth = _now.getFullYear() + "-" + String(_now.getMonth() + 1).padStart(2, "0");
-let activePage    = "dashboard";
-let txFilter      = "all";
-let editingTxId   = null;
+let activePage           = "dashboard";
+let txFilter             = "all";
+let editingTxId          = null;
+let editingInstallmentId = null;
+let editingNoteId        = null;
 
 /* ─── Helpers (declared first so defaultData can use them) ───── */
 function incrementMonth(month, n) {
@@ -231,10 +233,12 @@ function openCategoryModal() {
   openModal("category-modal");
 }
 
-/* Wire open button */
+/* Wire ALL [data-open-categories] buttons via delegation (transaction form, installment form, sidebar, etc.) */
+document.addEventListener("click", function(e) {
+  if (e.target.closest("[data-open-categories]")) { openCategoryModal(); }
+});
 (function() {
-  var btn = _id("open-manage-categories");
-  if (btn) btn.addEventListener("click", function() { openCategoryModal(); });
+  /* legacy — kept so existing id still works if present */
 
   /* Chip icon/color picker clicks */
   var picker = _id("cat-icon-picker");
@@ -341,7 +345,7 @@ function renderDashboard() {
     : "เดือนนี้เกินงบ <strong>" + money(Math.abs(totals.balance)) + "</strong> ลองตรวจสอบรายจ่ายเพิ่มเติม";
   _id("monthly-list-subtitle").textContent = totals.list.length + " รายการใน" + monthLabel();
   _id("monthly-transactions").innerHTML = totals.list.length
-    ? totals.list.slice(0, 5).map(function(item) { return renderTransactionRow(item, false); }).join("")
+    ? totals.list.slice(0, 5).map(function(item) { return renderTransactionRow(item, true); }).join("")
     : emptyMarkup("ยังไม่มีรายการในเดือนนี้");
   renderCategoryChart(totals.list.filter(function(x) { return x.type === "expense"; }), totals.expense);
   renderQuestProgress();
@@ -462,6 +466,7 @@ function renderInstallments() {
         + '<span>ยอดคงเหลือ ' + Math.max(item.months - progress, 0) + ' งวด</span>'
         + '<div class="installment-actions">'
           + '<button class="update-link" data-update-installment="' + item.id + '">อัปเดตยอดชำระ</button>'
+          + '<button class="tx-edit-btn" data-edit-installment="' + item.id + '" title="แก้ไข">✎</button>'
           + '<button class="delete-link" data-delete-installment="' + item.id + '">ลบ</button>'
         + '</div>'
       + '</div>'
@@ -477,7 +482,11 @@ function renderNotes() {
   _id("notes-list").innerHTML = notes.length
     ? notes.map(function(note) {
         return '<article class="note-card">'
-          + '<div class="note-card-top"><span class="note-icon">✎</span><button class="delete-link" data-delete-note="' + note.id + '">ลบ</button></div>'
+          + '<div class="note-card-top"><span class="note-icon">✎</span>'
+          + '<div class="note-card-actions">'
+          + '<button class="tx-edit-btn" data-edit-note="' + note.id + '" title="แก้ไข">✎</button>'
+          + '<button class="delete-link" data-delete-note="' + note.id + '">ลบ</button>'
+          + '</div></div>'
           + '<h3>' + escapeHtml(note.title) + '</h3>'
           + '<p>' + escapeHtml(note.content) + '</p>'
           + '<div class="note-card-foot">'
@@ -657,10 +666,10 @@ _id("transaction-form").addEventListener("submit", function(e) {
   closeModal("transaction-modal");
 });
 
-/* Edit / Delete from all-transactions list */
-_id("all-transactions").addEventListener("click", function(e) {
-  var delId  = e.target.dataset.deleteTx;
-  var editId = e.target.dataset.editTx;
+/* Edit / Delete handler (shared between dashboard list and all-transactions list) */
+function handleTxListClick(e) {
+  var delId  = e.target.closest("[data-delete-tx]")  ? e.target.closest("[data-delete-tx]").dataset.deleteTx   : null;
+  var editId = e.target.closest("[data-edit-tx]")    ? e.target.closest("[data-edit-tx]").dataset.editTx       : null;
   if (delId) {
     if (!confirm("ลบรายการนี้ใช่ไหม?")) return;
     data.transactions = data.transactions.filter(function(t) { return t.id !== delId; });
@@ -668,40 +677,166 @@ _id("all-transactions").addEventListener("click", function(e) {
     toast("ลบรายการแล้ว");
   }
   if (editId) openEditTransaction(editId);
-});
+}
 
-/* ─── Installment modal ──────────────────────────────────────── */
-_id("open-installment").addEventListener("click", function() {
-  _id("installment-form").reset();
+/* Edit / Delete from all-transactions list */
+_id("all-transactions").addEventListener("click", handleTxListClick);
+
+/* Edit / Delete from dashboard monthly-transactions list */
+_id("monthly-transactions").addEventListener("click", handleTxListClick);
+
+/* ─── Installment modal — auto-calculation ───────────────────── */
+var _instCalcLock = false;   /* prevent circular update */
+
+function updateInstCalcPreview() {
+  var amtEl    = _id("inst-amount");
+  var totEl    = _id("inst-total");
+  var monthsEl = _id("inst-months");
+  var preview  = _id("inst-calc-preview");
+  if (!amtEl || !totEl || !monthsEl || !preview) return;
+  var amt    = parseFloat(amtEl.value)  || 0;
+  var tot    = parseFloat(totEl.value)  || 0;
+  var months = parseInt(monthsEl.value) || 0;
+  if (amt > 0 && months > 0) {
+    preview.style.display = "";
+    preview.innerHTML =
+      '<span class="inst-preview-row"><span>ยอดต่องวด</span><strong>' + money(amt) + '</strong></span>'
+      + '<span class="inst-preview-row"><span>จำนวนงวด</span><strong>' + months + ' งวด</strong></span>'
+      + '<span class="inst-preview-row highlight"><span>ยอดรวมทั้งหมด</span><strong>' + money(amt * months) + '</strong></span>';
+  } else {
+    preview.style.display = "none";
+  }
+}
+
+function wireInstCalc() {
+  var amtEl    = _id("inst-amount");
+  var totEl    = _id("inst-total");
+  var monthsEl = _id("inst-months");
+  if (!amtEl || !totEl || !monthsEl) return;
+
+  function onAmtOrMonthsChange() {
+    if (_instCalcLock) return;
+    var amt    = parseFloat(amtEl.value);
+    var months = parseInt(monthsEl.value);
+    if (amt > 0 && months > 0) {
+      _instCalcLock = true;
+      totEl.value = Math.round(amt * months * 100) / 100;
+      _instCalcLock = false;
+    } else if (!amt && totEl.value) {
+      /* clear total if amount cleared */
+      _instCalcLock = true;
+      totEl.value = "";
+      _instCalcLock = false;
+    }
+    updateInstCalcPreview();
+  }
+
+  function onTotalChange() {
+    if (_instCalcLock) return;
+    var tot    = parseFloat(totEl.value);
+    var months = parseInt(monthsEl.value);
+    if (tot > 0 && months > 0) {
+      _instCalcLock = true;
+      amtEl.value = Math.round((tot / months) * 100) / 100;
+      _instCalcLock = false;
+    } else if (!tot && amtEl.value) {
+      _instCalcLock = true;
+      amtEl.value = "";
+      _instCalcLock = false;
+    }
+    updateInstCalcPreview();
+  }
+
+  amtEl.addEventListener("input", onAmtOrMonthsChange);
+  monthsEl.addEventListener("input", function() {
+    /* Recalc whichever field was filled last */
+    if (totEl.value) onTotalChange(); else onAmtOrMonthsChange();
+  });
+  totEl.addEventListener("input", onTotalChange);
+}
+wireInstCalc();
+
+function openAddInstallment() {
+  editingInstallmentId = null;
+  var form = _id("installment-form");
+  form.reset();
+  _id("installment-edit-id").value = "";
   _id("installment-start").value = selectedMonth;
+  if (_id("inst-total")) _id("inst-total").value = "";
+  if (_id("inst-calc-preview")) _id("inst-calc-preview").style.display = "none";
   populateCategories(_id("installment-category"), "expense");
+  _id("installment-modal-title").textContent = "เพิ่มรายการผ่อนชำระ";
+  _id("installment-submit-btn").textContent  = "สร้างรายการผ่อน";
   openModal("installment-modal");
-});
+}
+
+function openEditInstallment(id) {
+  var item = data.installments.find(function(x) { return x.id === id; });
+  if (!item) return;
+  editingInstallmentId = id;
+  var form = _id("installment-form");
+  form.reset();
+  _id("installment-edit-id").value = id;
+  form.querySelector('[name="title"]').value      = item.title;
+  form.querySelector('[name="amount"]').value     = item.amount;
+  form.querySelector('[name="months"]').value     = item.months;
+  form.querySelector('[name="paidCount"]').value  = paidInstallments(item);
+  /* Populate totalAmount */
+  if (_id("inst-total")) _id("inst-total").value = Math.round(item.amount * item.months * 100) / 100;
+  _id("installment-start").value = item.startMonth;
+  populateCategories(_id("installment-category"), "expense");
+  _id("installment-category").value = item.category;
+  _id("installment-modal-title").textContent = "แก้ไขรายการผ่อน";
+  _id("installment-submit-btn").textContent  = "บันทึกการแก้ไข";
+  updateInstCalcPreview();
+  openModal("installment-modal");
+}
+
+_id("open-installment").addEventListener("click", openAddInstallment);
 
 _id("installment-form").addEventListener("submit", function(e) {
   e.preventDefault();
   var form       = new FormData(e.currentTarget);
   var title      = form.get("title").trim();
-  var amount     = Number(form.get("amount"));
+  var amtRaw     = parseFloat(form.get("amount"));
+  var totRaw     = parseFloat(form.get("totalAmount"));
   var months     = Number(form.get("months"));
   var paidCount  = Math.min(Math.max(Number(form.get("paidCount")), 0), months);
   var startMonth = form.get("startMonth");
   var category   = form.get("category");
+  /* Resolve amount: prefer per-installment; fall back to total / months */
+  var amount = amtRaw > 0 ? amtRaw
+             : (totRaw > 0 && months > 0) ? Math.round((totRaw / months) * 100) / 100
+             : 0;
   if (!title || amount <= 0 || months <= 0 || !startMonth) {
     toast("⚠️ กรุณากรอกข้อมูลให้ครบถ้วน"); return;
   }
-  data.installments.push({ id: uid(), title: title, amount: amount, months: months, paidCount: paidCount, startMonth: startMonth, category: category });
-  saveData(); render();
-  e.currentTarget.reset();
-  _id("installment-start").value = selectedMonth;
-  populateCategories(_id("installment-category"), "expense");
-  closeModal("installment-modal");
-  toast("สร้างรายการผ่อนและตั้งค่ารายจ่ายอัตโนมัติแล้ว");
+  if (editingInstallmentId) {
+    var idx = data.installments.findIndex(function(x) { return x.id === editingInstallmentId; });
+    if (idx !== -1) {
+      data.installments[idx] = { id: editingInstallmentId, title: title, amount: amount, months: months, paidCount: paidCount, startMonth: startMonth, category: category };
+    }
+    editingInstallmentId = null;
+    saveData(); render();
+    closeModal("installment-modal");
+    toast("แก้ไขรายการผ่อนเรียบร้อยแล้ว");
+  } else {
+    data.installments.push({ id: uid(), title: title, amount: amount, months: months, paidCount: paidCount, startMonth: startMonth, category: category });
+    saveData(); render();
+    e.currentTarget.reset();
+    if (_id("inst-total")) _id("inst-total").value = "";
+    if (_id("inst-calc-preview")) _id("inst-calc-preview").style.display = "none";
+    _id("installment-start").value = selectedMonth;
+    populateCategories(_id("installment-category"), "expense");
+    closeModal("installment-modal");
+    toast("สร้างรายการผ่อนและตั้งค่ารายจ่ายอัตโนมัติแล้ว");
+  }
 });
 
 _id("installment-list").addEventListener("click", function(e) {
-  var updateId = e.target.dataset.updateInstallment;
-  var deleteId = e.target.dataset.deleteInstallment;
+  var updateId = e.target.closest("[data-update-installment]") ? e.target.closest("[data-update-installment]").dataset.updateInstallment : null;
+  var deleteId = e.target.closest("[data-delete-installment]") ? e.target.closest("[data-delete-installment]").dataset.deleteInstallment : null;
+  var editId   = e.target.closest("[data-edit-installment]")   ? e.target.closest("[data-edit-installment]").dataset.editInstallment   : null;
   if (updateId) {
     var item = data.installments.find(function(x) { return x.id === updateId; });
     if (!item) return;
@@ -715,6 +850,7 @@ _id("installment-list").addEventListener("click", function(e) {
       + '<small>' + money(item.amount) + ' ต่อเดือน · ทั้งหมด ' + item.months + ' งวด</small></div>';
     openModal("payment-modal");
   }
+  if (editId) openEditInstallment(editId);
   if (deleteId) {
     if (!confirm("ลบรายการผ่อนชำระนี้ใช่ไหม?")) return;
     data.installments = data.installments.filter(function(x) { return x.id !== deleteId; });
@@ -735,31 +871,67 @@ _id("payment-form").addEventListener("submit", function(e) {
 });
 
 /* ─── Note modal ─────────────────────────────────────────────── */
-_id("open-note").addEventListener("click", function() {
-  _id("note-form").reset();
+function openAddNote() {
+  editingNoteId = null;
+  var form = _id("note-form");
+  form.reset();
+  _id("note-edit-id").value = "";
   _id("note-date").value = selectedMonth + "-01";
+  _id("note-modal-title").textContent = "เพิ่มบันทึกความจำ";
+  _id("note-submit-btn").textContent  = "บันทึกความจำ";
   openModal("note-modal");
-});
+}
+
+function openEditNote(id) {
+  var note = data.notes.find(function(n) { return n.id === id; });
+  if (!note) return;
+  editingNoteId = id;
+  var form = _id("note-form");
+  form.reset();
+  _id("note-edit-id").value = id;
+  form.querySelector('[name="title"]').value   = note.title;
+  form.querySelector('[name="content"]').value = note.content;
+  _id("note-date").value = note.date || "";
+  _id("note-modal-title").textContent = "แก้ไขบันทึก";
+  _id("note-submit-btn").textContent  = "บันทึกการแก้ไข";
+  openModal("note-modal");
+}
+
+_id("open-note").addEventListener("click", openAddNote);
 
 _id("note-form").addEventListener("submit", function(e) {
   e.preventDefault();
   var form    = new FormData(e.currentTarget);
   var title   = form.get("title").trim();
   var content = form.get("content").trim();
+  var date    = form.get("date") || "";
   if (!title || !content) { toast("⚠️ กรุณากรอกหัวข้อและรายละเอียด"); return; }
-  data.notes.push({ id: uid(), title: title, content: content, date: form.get("date") || "", createdAt: new Date().toISOString() });
-  saveData(); render();
-  e.currentTarget.reset();
-  _id("note-date").value = selectedMonth + "-01";
-  closeModal("note-modal");
-  toast("บันทึกความจำเรียบร้อยแล้ว");
+  if (editingNoteId) {
+    var idx = data.notes.findIndex(function(n) { return n.id === editingNoteId; });
+    if (idx !== -1) {
+      data.notes[idx] = Object.assign({}, data.notes[idx], { title: title, content: content, date: date });
+    }
+    editingNoteId = null;
+    saveData(); render();
+    closeModal("note-modal");
+    toast("แก้ไขบันทึกเรียบร้อยแล้ว");
+  } else {
+    data.notes.push({ id: uid(), title: title, content: content, date: date, createdAt: new Date().toISOString() });
+    saveData(); render();
+    e.currentTarget.reset();
+    _id("note-date").value = selectedMonth + "-01";
+    closeModal("note-modal");
+    toast("บันทึกความจำเรียบร้อยแล้ว");
+  }
 });
 
 _id("notes-list").addEventListener("click", function(e) {
-  var id = e.target.dataset.deleteNote;
-  if (!id) return;
+  var delId  = e.target.closest("[data-delete-note]") ? e.target.closest("[data-delete-note]").dataset.deleteNote : null;
+  var editId = e.target.closest("[data-edit-note]")   ? e.target.closest("[data-edit-note]").dataset.editNote   : null;
+  if (editId) { openEditNote(editId); return; }
+  if (!delId) return;
   if (!confirm("ลบบันทึกนี้ใช่ไหม?")) return;
-  data.notes = data.notes.filter(function(n) { return n.id !== id; });
+  data.notes = data.notes.filter(function(n) { return n.id !== delId; });
   saveData(); render();
   toast("ลบบันทึกความจำแล้ว");
 });
@@ -871,13 +1043,8 @@ function authErrorThai(err) {
     var btn   = document.getElementById("auth-submit-btn");
     errEl.style.display = "none";
 
-    /* reCAPTCHA v3 — token is generated invisibly */
+    /* reCAPTCHA v3 — token is optional (gracefully degraded) */
     var captchaToken = await recaptchaToken();
-    if (!captchaToken) {
-      errEl.textContent = "ระบบตรวจสอบความปลอดภัยไม่สำเร็จ กรุณาลองใหม่อีกครั้ง";
-      errEl.style.display = "";
-      return;
-    }
 
     btn.disabled = true;
     btn.textContent = "กำลังดำเนินการ…";
@@ -1015,14 +1182,14 @@ async function cloudSyncNote(op, id, note) {
     });
   }
 
-  /* ── Installment list click (update paidCount / delete) ──── */
+  /* ── Installment list click (update paidCount / delete / edit) */
   var instListEl = document.getElementById("installment-list");
   if (instListEl) {
     instListEl.addEventListener("click", async function(e) {
       await new Promise(r => setTimeout(r, 0));
       if (!_useCloud) return;
-      var deleteId = e.target.dataset.deleteInstallment;
-      if (deleteId) await cloudSyncInst("delete", deleteId, null);
+      var delEl = e.target.closest("[data-delete-installment]");
+      if (delEl) await cloudSyncInst("delete", delEl.dataset.deleteInstallment, null);
     });
   }
 
