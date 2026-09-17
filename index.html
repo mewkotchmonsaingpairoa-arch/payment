@@ -35,7 +35,11 @@
             <span class="safe-icon">⌁</span>
             <div><strong>ข้อมูลของคุณปลอดภัย</strong><small>บันทึกไว้ในอุปกรณ์นี้</small></div>
           </div>
-          <div class="profile"><span class="avatar">พ</span><div><strong>พิมพ์ชนก</strong><small>บัญชีส่วนตัว</small></div><span class="more">•••</span></div>
+          <div class="profile">
+            <span class="avatar">พ</span>
+            <div class="profile-info"><strong>พิมพ์ชนก</strong><small>บัญชีส่วนตัว</small></div>
+            <button id="signout-btn" class="signout-btn" title="ออกจากระบบ" onclick="handleSignOut()">⏋</button>
+          </div>
         </div>
       </aside>
 
@@ -153,7 +157,7 @@
       <form class="modal" id="transaction-form">
         <div class="modal-title"><div><p class="eyebrow">บันทึกรายการ</p><h2 id="tx-modal-title">เพิ่มรายรับหรือรายจ่าย</h2></div><button type="button" class="close" data-close="transaction-modal">×</button></div>
         <label>ประเภทรายการ <div class="segmented"><input type="radio" name="transactionType" value="expense" id="type-expense" checked><label for="type-expense">รายจ่าย</label><input type="radio" name="transactionType" value="income" id="type-income"><label for="type-income">รายรับ</label></div></label>
-        <div class="form-grid"><label>ชื่อรายการ<input required name="title" placeholder="เช่น ค่าอาหาร" maxlength="48" /></label><label>จำนวนเงิน<input required name="amount" type="number" min="1" step="1" placeholder="0" inputmode="decimal" /></label><label>หมวดหมู่<select name="category" id="transaction-category"></select></label><label>วันที่<input required name="date" id="transaction-date" type="date" /></label></div>
+        <div class="form-grid"><label>ชื่อรายการ<input required name="title" placeholder="เช่น ค่าอาหาร" maxlength="48" /></label><label>จำนวนเงิน<input required name="amount" type="number" min="1" step="1" placeholder="0" inputmode="decimal" /></label><label>หมวดหมู่<div class="category-select-row"><select name="category" id="transaction-category"></select><button type="button" id="open-manage-categories" class="btn-manage-cat" title="จัดการหมวดหมู่">⚙</button></div></label><label>วันที่<input required name="date" id="transaction-date" type="date" /></label></div>
         <label>หมายเหตุ <textarea name="note" placeholder="เพิ่มรายละเอียด (ไม่บังคับ)" maxlength="100"></textarea></label>
         <div class="modal-actions"><button type="button" class="button ghost" data-close="transaction-modal">ยกเลิก</button><button class="button primary" id="tx-submit-btn" type="submit">บันทึกรายการ</button></div>
       </form>
@@ -190,6 +194,44 @@
     </div>
 
     <div class="toast" id="toast" role="status"></div>
+
+    <!-- ═══ CATEGORY MANAGEMENT MODAL ══════════════════════════ -->
+    <div class="modal-backdrop" id="category-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="cat-modal-title">
+      <div class="modal" style="max-width:500px">
+        <div class="modal-title">
+          <div><p class="eyebrow">จัดการหมวดหมู่</p><h2 id="cat-modal-title">หมวดหมู่ของคุณ</h2></div>
+          <button type="button" class="close" data-close="category-modal">×</button>
+        </div>
+        <div id="cat-list-expense" class="cat-section">
+          <p class="cat-section-title">รายจ่าย</p>
+          <div id="cat-chips-expense" class="cat-chips"></div>
+        </div>
+        <div id="cat-list-income" class="cat-section">
+          <p class="cat-section-title">รายรับ</p>
+          <div id="cat-chips-income" class="cat-chips"></div>
+        </div>
+        <form id="add-category-form" class="add-cat-form">
+          <div class="form-grid">
+            <label>ชื่อหมวดหมู่
+              <input required name="catLabel" id="cat-name-input" placeholder="เช่น ท่องเที่ยว" maxlength="24" />
+            </label>
+            <label>ประเภท
+              <select name="catType" id="cat-type-select">
+                <option value="expense">รายจ่าย</option>
+                <option value="income">รายรับ</option>
+              </select>
+            </label>
+          </div>
+          <div class="add-cat-row">
+            <span class="cat-icon-picker" id="cat-icon-picker"></span>
+            <input type="hidden" name="catIcon" id="cat-icon-val" value="○" />
+            <input type="hidden" name="catColor" id="cat-color-val" value="#9da7b9" />
+            <button class="button primary small" type="submit">＋ เพิ่มหมวดหมู่</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <!-- ════════════════════════════════════════════════════════ -->
 
     <!-- Mobile bottom navigation -->
     <nav class="mobile-nav" aria-label="เมนูมือถือ">

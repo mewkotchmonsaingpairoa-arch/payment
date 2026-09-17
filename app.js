@@ -1,19 +1,57 @@
 /* ─── Constants ──────────────────────────────────────────────── */
 const MONTH_NAMES = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
-const CATEGORY_META = {
-  food:        { label: "อาหารและเครื่องดื่ม",  icon: "◒", color: "#f29b52" },
-  transport:   { label: "เดินทาง",               icon: "⌁", color: "#6388d8" },
-  bills:       { label: "บิลและสาธารณูปโภค",     icon: "⌂", color: "#8d77d5" },
-  shopping:    { label: "ช้อปปิ้ง",              icon: "◇", color: "#e7809b" },
-  installment: { label: "ผ่อนชำระ",              icon: "◫", color: "#8b70d4" },
-  health:      { label: "สุขภาพ",                icon: "✚", color: "#4bb59b" },
-  other:       { label: "อื่น ๆ",                icon: "○", color: "#9da7b9" },
-  salary:      { label: "เงินเดือน",             icon: "▣", color: "#21a67a" },
-  freelance:   { label: "รายได้เสริม",           icon: "✦", color: "#3e9d7d" }
+/* ─── Category meta (base + user-defined, loaded at boot) ───── */
+const _BASE_CATEGORY_META = {
+  food:        { label: "อาหารและเครื่องดื่ม",  icon: "◒", color: "#f29b52", fixed: true },
+  transport:   { label: "เดินทาง",               icon: "⌁", color: "#6388d8", fixed: true },
+  bills:       { label: "บิลและสาธารณูปโภค",     icon: "⌂", color: "#8d77d5", fixed: true },
+  shopping:    { label: "ช้อปปิ้ง",              icon: "◇", color: "#e7809b", fixed: true },
+  installment: { label: "ผ่อนชำระ",              icon: "◫", color: "#8b70d4", fixed: true },
+  health:      { label: "สุขภาพ",                icon: "✚", color: "#4bb59b", fixed: true },
+  other:       { label: "อื่น ๆ",                icon: "○", color: "#9da7b9", fixed: true },
+  salary:      { label: "เงินเดือน",             icon: "▣", color: "#21a67a", fixed: true },
+  freelance:   { label: "รายได้เสริม",           icon: "✦", color: "#3e9d7d", fixed: true }
 };
-const EXPENSE_CATS = ["food","transport","bills","shopping","installment","health","other"];
-const INCOME_CATS  = ["salary","freelance","other"];
+
+function _loadCustomCategories() {
+  try {
+    var raw = localStorage.getItem(CAT_STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(_) {}
+  return {};
+}
+function _saveCustomCategories() {
+  var customs = {};
+  Object.keys(CATEGORY_META).forEach(function(k) {
+    if (!CATEGORY_META[k].fixed) customs[k] = CATEGORY_META[k];
+  });
+  localStorage.setItem(CAT_STORAGE_KEY, JSON.stringify(customs));
+}
+
+/* Merge base + custom at boot */
+var CATEGORY_META = Object.assign({}, _BASE_CATEGORY_META, _loadCustomCategories());
+/* Derived lists (will be updated when categories change) */
+var EXPENSE_CATS, INCOME_CATS;
+function _rebuildCatLists() {
+  EXPENSE_CATS = [];
+  INCOME_CATS  = [];
+  Object.keys(CATEGORY_META).forEach(function(k) {
+    var m = CATEGORY_META[k];
+    if (m.type === "income") INCOME_CATS.push(k);
+    else if (k === "salary" || k === "freelance") INCOME_CATS.push(k);
+    else EXPENSE_CATS.push(k);
+  });
+  /* ensure "other" stays at end of expense */
+  EXPENSE_CATS = EXPENSE_CATS.filter(function(k){ return k !== "other"; });
+  EXPENSE_CATS.push("other");
+}
+_rebuildCatLists();
 const STORAGE_KEY  = "pocketbloom-v2";
+const CAT_STORAGE_KEY = "pocketbloom-cats-v1";
+
+/* ─── Icon palette for custom categories ───────────────────── */
+const CAT_ICONS  = ["●","◆","▤","★","❤","✔","○","⋆","⊙","↵","⌂","⟂","⏁","☄","✎","▫","♪","☀","✈","⚽"];
+const CAT_COLORS = ["#f29b52","#6388d8","#8d77d5","#e7809b","#4bb59b","#e5a54b","#5db8de","#e87272","#7dc98f","#9da7b9","#21a67a","#3e9d7d","#c56ba8","#d4885a","#6cb3e0"];
 
 /* ─── UUID fallback (works on file:// too) ───────────────────── */
 function uid() {
@@ -146,10 +184,118 @@ function populateCategories(select, type) {
   var cats = type === "income" ? INCOME_CATS : EXPENSE_CATS;
   var prev = select.value;
   select.innerHTML = cats.map(function(k) {
-    return '<option value="' + k + '">' + CATEGORY_META[k].label + '</option>';
+    var meta = CATEGORY_META[k] || CATEGORY_META.other;
+    return '<option value="' + k + '">' + meta.icon + ' ' + meta.label + '</option>';
   }).join("");
   if (cats.indexOf(prev) !== -1) select.value = prev;
 }
+
+/* ─── Category Management Modal ─────────────────────────── */
+var _selectedCatIcon  = CAT_ICONS[0];
+var _selectedCatColor = CAT_COLORS[0];
+
+function renderCategoryModal() {
+  ["expense","income"].forEach(function(type) {
+    var cats = type === "income" ? INCOME_CATS : EXPENSE_CATS;
+    var el = _id("cat-chips-" + type);
+    if (!el) return;
+    el.innerHTML = cats.map(function(k) {
+      var m = CATEGORY_META[k];
+      var delBtn = !m.fixed
+        ? '<button class="cat-chip-del" data-del-cat="' + k + '" title="ลบ">&times;</button>'
+        : '';
+      return '<span class="cat-chip" style="border-color:' + m.color + ';background:' + m.color + '22">'
+        + '<i style="background:' + m.color + '">' + m.icon + '</i>'
+        + m.label + delBtn + '</span>';
+    }).join("");
+  });
+
+  /* Icon picker */
+  var picker = _id("cat-icon-picker");
+  if (picker) {
+    picker.innerHTML = CAT_ICONS.map(function(ic) {
+      return '<button type="button" class="icon-opt' + (ic === _selectedCatIcon ? ' selected' : '') + '" data-icon="' + ic + '">' + ic + '</button>';
+    }).join("") + CAT_COLORS.map(function(cl) {
+      return '<button type="button" class="color-opt' + (cl === _selectedCatColor ? ' selected' : '') + '" data-color="' + cl + '" style="background:' + cl + '" title="' + cl + '"></button>';
+    }).join("");
+  }
+  if (_id("cat-icon-val"))  _id("cat-icon-val").value  = _selectedCatIcon;
+  if (_id("cat-color-val")) _id("cat-color-val").value = _selectedCatColor;
+}
+
+function openCategoryModal() {
+  _selectedCatIcon  = CAT_ICONS[0];
+  _selectedCatColor = CAT_COLORS[0];
+  renderCategoryModal();
+  if (_id("add-category-form")) _id("add-category-form").reset();
+  openModal("category-modal");
+}
+
+/* Wire open button */
+(function() {
+  var btn = _id("open-manage-categories");
+  if (btn) btn.addEventListener("click", function() { openCategoryModal(); });
+
+  /* Chip icon/color picker clicks */
+  var picker = _id("cat-icon-picker");
+  if (picker) {
+    picker.addEventListener("click", function(e) {
+      var iconBtn  = e.target.closest("[data-icon]");
+      var colorBtn = e.target.closest("[data-color]");
+      if (iconBtn) {
+        _selectedCatIcon = iconBtn.dataset.icon;
+        picker.querySelectorAll(".icon-opt").forEach(function(b) { b.classList.toggle("selected", b === iconBtn); });
+        if (_id("cat-icon-val")) _id("cat-icon-val").value = _selectedCatIcon;
+      }
+      if (colorBtn) {
+        _selectedCatColor = colorBtn.dataset.color;
+        picker.querySelectorAll(".color-opt").forEach(function(b) { b.classList.toggle("selected", b === colorBtn); });
+        if (_id("cat-color-val")) _id("cat-color-val").value = _selectedCatColor;
+      }
+    });
+  }
+
+  /* Add category form */
+  var addForm = _id("add-category-form");
+  if (addForm) {
+    addForm.addEventListener("submit", function(e) {
+      e.preventDefault();
+      var fd    = new FormData(addForm);
+      var label = fd.get("catLabel").trim();
+      var type  = fd.get("catType");
+      var icon  = fd.get("catIcon") || _selectedCatIcon;
+      var color = fd.get("catColor") || _selectedCatColor;
+      if (!label) { toast("⚠️ กรุณาใส่ชื่อหมวดหมู่"); return; }
+      /* Generate a key from label */
+      var key = "cat_" + label.replace(/\s+/g, "_").toLowerCase() + "_" + Date.now().toString(36);
+      CATEGORY_META[key] = { label: label, icon: icon, color: color, type: type, fixed: false };
+      _rebuildCatLists();
+      _saveCustomCategories();
+      /* Refresh category dropdowns */
+      var txType = document.querySelector('input[name="transactionType"]:checked');
+      populateCategories(_id("transaction-category"), txType ? txType.value : "expense");
+      populateCategories(_id("installment-category"), "expense");
+      addForm.reset();
+      renderCategoryModal();
+      toast("✅ เพิ่มหมวดหมู่ \"" + label + "\" แล้ว");
+    });
+  }
+
+  /* Delete custom category chips */
+  document.addEventListener("click", function(e) {
+    var delKey = e.target.dataset.delCat;
+    if (!delKey) return;
+    if (!confirm("ลบหมวดหมู่ \"" + (CATEGORY_META[delKey] ? CATEGORY_META[delKey].label : delKey) + "\" ใช่ไหม?")) return;
+    delete CATEGORY_META[delKey];
+    _rebuildCatLists();
+    _saveCustomCategories();
+    var txType = document.querySelector('input[name="transactionType"]:checked');
+    populateCategories(_id("transaction-category"), txType ? txType.value : "expense");
+    populateCategories(_id("installment-category"), "expense");
+    renderCategoryModal();
+    toast("ลบหมวดหมู่แล้ว");
+  });
+})();
 
 /* ─── Render: transaction row ────────────────────────────────── */
 function renderTransactionRow(item, withActions) {
@@ -636,7 +782,7 @@ switchPage("dashboard");
 let _useCloud    = false;
 let _currentUser = null;
 
-/* ── Loading overlay ──────────────────────────────────────── */
+/* ── Loading overlay ────────────────────────────────        */
 function showCloudLoader(msg) {
   var el = _id("cloud-loader");
   if (!el) {
@@ -756,12 +902,15 @@ function authErrorThai(err) {
 function updateProfileChip(user) {
   var name   = (user && (user.user_metadata?.display_name || user.email?.split("@")[0])) || "ผู้ใช้";
   var avatar = name.charAt(0).toUpperCase();
-  var prof   = document.querySelector(".profile");
-  if (!prof) return;
-  prof.innerHTML =
-    '<span class="avatar">' + avatar + '</span>' +
-    '<div><strong>' + name + '</strong><small>' + (user ? user.email : "Offline") + '</small></div>' +
-    '<button style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:16px" title="ออกจากระบบ" onclick="handleSignOut()">⎋</button>';
+  /* Update avatar letter */
+  var avatarEl = document.querySelector(".profile .avatar");
+  if (avatarEl) avatarEl.textContent = avatar;
+  /* Update name/email */
+  var infoEl = document.querySelector(".profile .profile-info");
+  if (infoEl) infoEl.innerHTML = '<strong>' + escapeHtml(name) + '</strong><small>' + escapeHtml(user ? user.email : "Offline") + '</small>';
+  /* Show signout button */
+  var btnEl = _id("signout-btn");
+  if (btnEl) btnEl.style.display = "";
 }
 
 async function handleSignOut() {
