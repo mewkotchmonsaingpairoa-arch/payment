@@ -38,7 +38,7 @@
           <div class="profile">
             <span class="avatar">พ</span>
             <div class="profile-info"><strong>พิมพ์ชนก</strong><small>บัญชีส่วนตัว</small></div>
-            <button id="signout-btn" class="signout-btn" title="ออกจากระบบ" onclick="handleSignOut()">⏋</button>
+            <button id="signout-btn" class="signout-btn" title="ออกจากระบบ">⏋</button>
           </div>
         </div>
       </aside>
@@ -251,8 +251,8 @@
         <div class="modal-body">
           <!-- Tab switcher -->
           <div style="display:flex;gap:8px;margin-bottom:20px">
-            <button id="auth-tab-login"  class="filter active" style="flex:1;padding:10px" onclick="authSwitchTab('login')">เข้าสู่ระบบ</button>
-            <button id="auth-tab-signup" class="filter"        style="flex:1;padding:10px" onclick="authSwitchTab('signup')">สมัครสมาชิก</button>
+            <button id="auth-tab-login"  class="filter active" style="flex:1;padding:10px">เข้าสู่ระบบ</button>
+            <button id="auth-tab-signup" class="filter"        style="flex:1;padding:10px">สมัครสมาชิก</button>
           </div>
 
           <form id="auth-form" autocomplete="on">
@@ -273,7 +273,7 @@
           </form>
 
           <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);text-align:center">
-            <small style="color:var(--text-muted)">หรือ <a href="#" id="auth-offline-link" style="color:var(--accent-primary)" onclick="useOfflineMode(event)">ใช้งานแบบ Offline (ไม่บันทึก Cloud)</a></small>
+            <small style="color:var(--text-muted)">หรือ <a href="#" id="auth-offline-link" style="color:var(--accent-primary)">ใช้งานแบบ Offline (ไม่บันทึก Cloud)</a></small>
           </div>
         </div>
       </div>

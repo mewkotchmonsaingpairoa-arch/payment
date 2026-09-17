@@ -781,6 +781,7 @@ switchPage("dashboard");
 
 let _useCloud    = false;
 let _currentUser = null;
+let _isSyncing   = false;   /* guard: prevent Realtime from overwriting local changes */
 
 /* ── Loading overlay ────────────────────────────────        */
 function showCloudLoader(msg) {
@@ -937,28 +938,34 @@ function updateSafeCard(cloud) {
 
 async function cloudSyncTx(op, id, tx) {
   if (!_useCloud || !_currentUser) return;
+  _isSyncing = true;
   try {
     if (op === "add")    { var saved = await window.SupabaseDB.addTransaction(tx);    tx.id = saved.id; }
     if (op === "update") { await window.SupabaseDB.updateTransaction(id, tx); }
     if (op === "delete") { await window.SupabaseDB.deleteTransaction(id); }
   } catch (err) { console.warn("Cloud sync TX:", err.message); }
+  finally { setTimeout(function() { _isSyncing = false; }, 1500); }
 }
 
 async function cloudSyncInst(op, id, inst) {
   if (!_useCloud || !_currentUser) return;
+  _isSyncing = true;
   try {
     if (op === "add")    { var saved = await window.SupabaseDB.addInstallment(inst);    inst.id = saved.id; }
     if (op === "update") { await window.SupabaseDB.updateInstallment(id, inst); }
     if (op === "delete") { await window.SupabaseDB.deleteInstallment(id); }
   } catch (err) { console.warn("Cloud sync INST:", err.message); }
+  finally { setTimeout(function() { _isSyncing = false; }, 1500); }
 }
 
 async function cloudSyncNote(op, id, note) {
   if (!_useCloud || !_currentUser) return;
+  _isSyncing = true;
   try {
     if (op === "add")    { var saved = await window.SupabaseDB.addNote(note); note.id = saved.id; }
     if (op === "delete") { await window.SupabaseDB.deleteNote(id); }
   } catch (err) { console.warn("Cloud sync NOTE:", err.message); }
+  finally { setTimeout(function() { _isSyncing = false; }, 1500); }
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -1114,7 +1121,9 @@ document.addEventListener("supabase:ready", async function() {
 
         /* Start Realtime */
         await window.SupabaseRealtime.subscribe(user.id, function(table, payload) {
-          // On remote change from another device → reload data
+          // On remote change from ANOTHER device → reload data
+          // Skip if WE triggered this event (local sync in progress)
+          if (_isSyncing) return;
           window.SupabaseDB.loadAll().then(function(d) {
             data.transactions = d.transactions;
             data.installments = d.installments;
@@ -1142,3 +1151,11 @@ document.addEventListener("supabase:ready", async function() {
   });
 });
 
+
+/* ══════════════════════════════════════════════════════════════
+   CSP-SAFE EVENT BINDINGS (replaces inline onclick attributes)
+   ══════════════════════════════════════════════════════════════ */
+_id("signout-btn").addEventListener("click", handleSignOut);
+_id("auth-tab-login").addEventListener("click", function() { authSwitchTab("login"); });
+_id("auth-tab-signup").addEventListener("click", function() { authSwitchTab("signup"); });
+_id("auth-offline-link").addEventListener("click", function(e) { useOfflineMode(e); });
