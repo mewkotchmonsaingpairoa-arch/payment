@@ -70,6 +70,43 @@ let editingTxId          = null;
 let editingInstallmentId = null;
 let editingNoteId        = null;
 
+let _useCloud    = false;
+let _currentUser = null;
+let _isSyncing   = false;   /* guard: prevent Realtime from overwriting local changes */
+
+async function cloudSyncTx(op, id, tx) {
+  if (!_useCloud || !_currentUser || !window.SupabaseDB) return;
+  _isSyncing = true;
+  try {
+    if (op === "add")    { var saved = await window.SupabaseDB.addTransaction(tx); if (saved && saved.id) tx.id = saved.id; }
+    if (op === "update") { await window.SupabaseDB.updateTransaction(id, tx); }
+    if (op === "delete") { await window.SupabaseDB.deleteTransaction(id); }
+  } catch (err) { console.warn("Cloud sync TX:", err.message); }
+  finally { setTimeout(function() { _isSyncing = false; }, 1500); }
+}
+
+async function cloudSyncInst(op, id, inst) {
+  if (!_useCloud || !_currentUser || !window.SupabaseDB) return;
+  _isSyncing = true;
+  try {
+    if (op === "add")    { var saved = await window.SupabaseDB.addInstallment(inst); if (saved && saved.id) inst.id = saved.id; }
+    if (op === "update") { await window.SupabaseDB.updateInstallment(id, inst); }
+    if (op === "delete") { await window.SupabaseDB.deleteInstallment(id); }
+  } catch (err) { console.warn("Cloud sync INST:", err.message); }
+  finally { setTimeout(function() { _isSyncing = false; }, 1500); }
+}
+
+async function cloudSyncNote(op, id, note) {
+  if (!_useCloud || !_currentUser || !window.SupabaseDB) return;
+  _isSyncing = true;
+  try {
+    if (op === "add")    { var saved = await window.SupabaseDB.addNote(note); if (saved && saved.id) note.id = saved.id; }
+    if (op === "update") { await window.SupabaseDB.updateNote(id, note); }
+    if (op === "delete") { await window.SupabaseDB.deleteNote(id); }
+  } catch (err) { console.warn("Cloud sync NOTE:", err.message); }
+  finally { setTimeout(function() { _isSyncing = false; }, 1500); }
+}
+
 /* ─── Helpers (declared first so defaultData can use them) ───── */
 function incrementMonth(month, n) {
   const parts = month.split("-").map(Number);
@@ -622,12 +659,13 @@ function openAddTransaction() {
 }
 
 function openEditTransaction(id) {
-  var item = data.transactions.find(function(t) { return t.id === id; });
+  var item = data.transactions.find(function(t) { return String(t.id) === String(id); });
   if (!item) return;
-  editingTxId = id;
+  editingTxId = item.id;
   var form = _id("transaction-form");
   form.reset();
-  form.querySelector('input[value="' + item.type + '"]').checked = true;
+  var radio = form.querySelector('input[value="' + item.type + '"]');
+  if (radio) radio.checked = true;
   populateCategories(txCategoryEl, item.type);
   form.querySelector('[name="title"]').value  = item.title;
   form.querySelector('[name="amount"]').value = item.amount;
@@ -653,12 +691,18 @@ _id("transaction-form").addEventListener("submit", function(e) {
   var note   = form.get("note").trim();
   if (!title || amount <= 0 || !date) { toast("⚠️ กรุณากรอกข้อมูลให้ครบถ้วน"); return; }
   if (editingTxId) {
-    var idx = data.transactions.findIndex(function(t) { return t.id === editingTxId; });
-    if (idx !== -1) data.transactions[idx] = { id: editingTxId, type: type, title: title, amount: amount, category: cat, date: date, note: note };
+    var editId = editingTxId;
+    var idx = data.transactions.findIndex(function(t) { return String(t.id) === String(editId); });
+    if (idx !== -1) {
+      data.transactions[idx] = { id: editId, type: type, title: title, amount: amount, category: cat, date: date, note: note };
+      cloudSyncTx("update", editId, data.transactions[idx]);
+    }
     toast("แก้ไขรายการเรียบร้อยแล้ว");
   } else {
-    data.transactions.push({ id: uid(), type: type, title: title, amount: amount, category: cat, date: date, note: note });
+    var newTx = { id: uid(), type: type, title: title, amount: amount, category: cat, date: date, note: note };
+    data.transactions.push(newTx);
     selectedMonth = date.slice(0, 7);
+    cloudSyncTx("add", null, newTx);
     toast("บันทึกรายการเรียบร้อยแล้ว");
   }
   editingTxId = null;
@@ -668,15 +712,20 @@ _id("transaction-form").addEventListener("submit", function(e) {
 
 /* Edit / Delete handler (shared between dashboard list and all-transactions list) */
 function handleTxListClick(e) {
-  var delId  = e.target.closest("[data-delete-tx]")  ? e.target.closest("[data-delete-tx]").dataset.deleteTx   : null;
-  var editId = e.target.closest("[data-edit-tx]")    ? e.target.closest("[data-edit-tx]").dataset.editTx       : null;
-  if (delId) {
+  var delBtn  = e.target.closest("[data-delete-tx]");
+  var editBtn = e.target.closest("[data-edit-tx]");
+  if (delBtn) {
+    var delId = delBtn.dataset.deleteTx;
     if (!confirm("ลบรายการนี้ใช่ไหม?")) return;
-    data.transactions = data.transactions.filter(function(t) { return t.id !== delId; });
+    data.transactions = data.transactions.filter(function(t) { return String(t.id) !== String(delId); });
+    cloudSyncTx("delete", delId, null);
     saveData(); render();
     toast("ลบรายการแล้ว");
   }
-  if (editId) openEditTransaction(editId);
+  if (editBtn) {
+    var editId = editBtn.dataset.editTx;
+    openEditTransaction(editId);
+  }
 }
 
 /* Edit / Delete from all-transactions list */
@@ -771,12 +820,12 @@ function openAddInstallment() {
 }
 
 function openEditInstallment(id) {
-  var item = data.installments.find(function(x) { return x.id === id; });
+  var item = data.installments.find(function(x) { return String(x.id) === String(id); });
   if (!item) return;
-  editingInstallmentId = id;
+  editingInstallmentId = item.id;
   var form = _id("installment-form");
   form.reset();
-  _id("installment-edit-id").value = id;
+  _id("installment-edit-id").value = item.id;
   form.querySelector('[name="title"]').value      = item.title;
   form.querySelector('[name="amount"]').value     = item.amount;
   form.querySelector('[name="months"]').value     = item.months;
@@ -812,16 +861,20 @@ _id("installment-form").addEventListener("submit", function(e) {
     toast("⚠️ กรุณากรอกข้อมูลให้ครบถ้วน"); return;
   }
   if (editingInstallmentId) {
-    var idx = data.installments.findIndex(function(x) { return x.id === editingInstallmentId; });
+    var editId = editingInstallmentId;
+    var idx = data.installments.findIndex(function(x) { return String(x.id) === String(editId); });
     if (idx !== -1) {
-      data.installments[idx] = { id: editingInstallmentId, title: title, amount: amount, months: months, paidCount: paidCount, startMonth: startMonth, category: category };
+      data.installments[idx] = { id: editId, title: title, amount: amount, months: months, paidCount: paidCount, startMonth: startMonth, category: category };
+      cloudSyncInst("update", editId, data.installments[idx]);
     }
     editingInstallmentId = null;
     saveData(); render();
     closeModal("installment-modal");
     toast("แก้ไขรายการผ่อนเรียบร้อยแล้ว");
   } else {
-    data.installments.push({ id: uid(), title: title, amount: amount, months: months, paidCount: paidCount, startMonth: startMonth, category: category });
+    var newInst = { id: uid(), title: title, amount: amount, months: months, paidCount: paidCount, startMonth: startMonth, category: category };
+    data.installments.push(newInst);
+    cloudSyncInst("add", null, newInst);
     saveData(); render();
     e.currentTarget.reset();
     if (_id("inst-total")) _id("inst-total").value = "";
@@ -834,11 +887,12 @@ _id("installment-form").addEventListener("submit", function(e) {
 });
 
 _id("installment-list").addEventListener("click", function(e) {
-  var updateId = e.target.closest("[data-update-installment]") ? e.target.closest("[data-update-installment]").dataset.updateInstallment : null;
-  var deleteId = e.target.closest("[data-delete-installment]") ? e.target.closest("[data-delete-installment]").dataset.deleteInstallment : null;
-  var editId   = e.target.closest("[data-edit-installment]")   ? e.target.closest("[data-edit-installment]").dataset.editInstallment   : null;
-  if (updateId) {
-    var item = data.installments.find(function(x) { return x.id === updateId; });
+  var updateBtn = e.target.closest("[data-update-installment]");
+  var deleteBtn = e.target.closest("[data-delete-installment]");
+  var editBtn   = e.target.closest("[data-edit-installment]");
+  if (updateBtn) {
+    var updateId = updateBtn.dataset.updateInstallment;
+    var item = data.installments.find(function(x) { return String(x.id) === String(updateId); });
     if (!item) return;
     var meta = CATEGORY_META[item.category] || CATEGORY_META.other;
     _id("payment-item-id").value    = item.id;
@@ -850,10 +904,15 @@ _id("installment-list").addEventListener("click", function(e) {
       + '<small>' + money(item.amount) + ' ต่อเดือน · ทั้งหมด ' + item.months + ' งวด</small></div>';
     openModal("payment-modal");
   }
-  if (editId) openEditInstallment(editId);
-  if (deleteId) {
+  if (editBtn) {
+    var editId = editBtn.dataset.editInstallment;
+    openEditInstallment(editId);
+  }
+  if (deleteBtn) {
+    var deleteId = deleteBtn.dataset.deleteInstallment;
     if (!confirm("ลบรายการผ่อนชำระนี้ใช่ไหม?")) return;
-    data.installments = data.installments.filter(function(x) { return x.id !== deleteId; });
+    data.installments = data.installments.filter(function(x) { return String(x.id) !== String(deleteId); });
+    cloudSyncInst("delete", deleteId, null);
     saveData(); render();
     toast("ลบรายการผ่อนชำระแล้ว");
   }
@@ -862,9 +921,11 @@ _id("installment-list").addEventListener("click", function(e) {
 _id("payment-form").addEventListener("submit", function(e) {
   e.preventDefault();
   var form = new FormData(e.currentTarget);
-  var item = data.installments.find(function(x) { return x.id === form.get("id"); });
+  var id   = form.get("id");
+  var item = data.installments.find(function(x) { return String(x.id) === String(id); });
   if (!item) return;
   item.paidCount = Math.min(Math.max(Number(form.get("paidCount")), 0), item.months);
+  cloudSyncInst("update", item.id, item);
   saveData(); render();
   closeModal("payment-modal");
   toast("อัปเดตยอดผ่อนชำระแล้ว");
@@ -883,12 +944,12 @@ function openAddNote() {
 }
 
 function openEditNote(id) {
-  var note = data.notes.find(function(n) { return n.id === id; });
+  var note = data.notes.find(function(n) { return String(n.id) === String(id); });
   if (!note) return;
-  editingNoteId = id;
+  editingNoteId = note.id;
   var form = _id("note-form");
   form.reset();
-  _id("note-edit-id").value = id;
+  _id("note-edit-id").value = note.id;
   form.querySelector('[name="title"]').value   = note.title;
   form.querySelector('[name="content"]').value = note.content;
   _id("note-date").value = note.date || "";
@@ -907,16 +968,20 @@ _id("note-form").addEventListener("submit", function(e) {
   var date    = form.get("date") || "";
   if (!title || !content) { toast("⚠️ กรุณากรอกหัวข้อและรายละเอียด"); return; }
   if (editingNoteId) {
-    var idx = data.notes.findIndex(function(n) { return n.id === editingNoteId; });
+    var editId = editingNoteId;
+    var idx = data.notes.findIndex(function(n) { return String(n.id) === String(editId); });
     if (idx !== -1) {
       data.notes[idx] = Object.assign({}, data.notes[idx], { title: title, content: content, date: date });
+      cloudSyncNote("update", editId, data.notes[idx]);
     }
     editingNoteId = null;
     saveData(); render();
     closeModal("note-modal");
     toast("แก้ไขบันทึกเรียบร้อยแล้ว");
   } else {
-    data.notes.push({ id: uid(), title: title, content: content, date: date, createdAt: new Date().toISOString() });
+    var newNote = { id: uid(), title: title, content: content, date: date, createdAt: new Date().toISOString() };
+    data.notes.push(newNote);
+    cloudSyncNote("add", null, newNote);
     saveData(); render();
     e.currentTarget.reset();
     _id("note-date").value = selectedMonth + "-01";
@@ -926,12 +991,18 @@ _id("note-form").addEventListener("submit", function(e) {
 });
 
 _id("notes-list").addEventListener("click", function(e) {
-  var delId  = e.target.closest("[data-delete-note]") ? e.target.closest("[data-delete-note]").dataset.deleteNote : null;
-  var editId = e.target.closest("[data-edit-note]")   ? e.target.closest("[data-edit-note]").dataset.editNote   : null;
-  if (editId) { openEditNote(editId); return; }
-  if (!delId) return;
+  var editBtn = e.target.closest("[data-edit-note]");
+  var delBtn  = e.target.closest("[data-delete-note]");
+  if (editBtn) {
+    var editId = editBtn.dataset.editNote;
+    openEditNote(editId);
+    return;
+  }
+  if (!delBtn) return;
+  var delId = delBtn.dataset.deleteNote;
   if (!confirm("ลบบันทึกนี้ใช่ไหม?")) return;
-  data.notes = data.notes.filter(function(n) { return n.id !== delId; });
+  data.notes = data.notes.filter(function(n) { return String(n.id) !== String(delId); });
+  cloudSyncNote("delete", delId, null);
   saveData(); render();
   toast("ลบบันทึกความจำแล้ว");
 });
@@ -950,10 +1021,6 @@ switchPage("dashboard");
 /* ══════════════════════════════════════════════════════════════
    SUPABASE AUTH INTEGRATION  v2  (ครอบคลุมทุก operation)
    ══════════════════════════════════════════════════════════════ */
-
-let _useCloud    = false;
-let _currentUser = null;
-let _isSyncing   = false;   /* guard: prevent Realtime from overwriting local changes */
 
 /* ── Loading overlay ────────────────────────────────        */
 function showCloudLoader(msg) {
@@ -1147,156 +1214,6 @@ function updateSafeCard(cloud) {
 
 /* ══════════════════════════════════════════════════════════════
    CLOUD SYNC HELPERS  (เรียกหลัง localStorage save ทุกครั้ง)
-   ══════════════════════════════════════════════════════════════ */
-
-async function cloudSyncTx(op, id, tx) {
-  if (!_useCloud || !_currentUser) return;
-  _isSyncing = true;
-  try {
-    if (op === "add")    { var saved = await window.SupabaseDB.addTransaction(tx);    tx.id = saved.id; }
-    if (op === "update") { await window.SupabaseDB.updateTransaction(id, tx); }
-    if (op === "delete") { await window.SupabaseDB.deleteTransaction(id); }
-  } catch (err) { console.warn("Cloud sync TX:", err.message); }
-  finally { setTimeout(function() { _isSyncing = false; }, 1500); }
-}
-
-async function cloudSyncInst(op, id, inst) {
-  if (!_useCloud || !_currentUser) return;
-  _isSyncing = true;
-  try {
-    if (op === "add")    { var saved = await window.SupabaseDB.addInstallment(inst);    inst.id = saved.id; }
-    if (op === "update") { await window.SupabaseDB.updateInstallment(id, inst); }
-    if (op === "delete") { await window.SupabaseDB.deleteInstallment(id); }
-  } catch (err) { console.warn("Cloud sync INST:", err.message); }
-  finally { setTimeout(function() { _isSyncing = false; }, 1500); }
-}
-
-async function cloudSyncNote(op, id, note) {
-  if (!_useCloud || !_currentUser) return;
-  _isSyncing = true;
-  try {
-    if (op === "add")    { var saved = await window.SupabaseDB.addNote(note); note.id = saved.id; }
-    if (op === "delete") { await window.SupabaseDB.deleteNote(id); }
-  } catch (err) { console.warn("Cloud sync NOTE:", err.message); }
-  finally { setTimeout(function() { _isSyncing = false; }, 1500); }
-}
-
-/* ══════════════════════════════════════════════════════════════
-   PATCH APP EVENT HANDLERS — inject cloud sync into existing
-   listeners by wrapping the form submit / click handlers
-   ══════════════════════════════════════════════════════════════ */
-
-(function patchAppHandlers() {
-  /* ── Transaction form ────────────────────────────────────── */
-  var txForm = document.getElementById("transaction-form");
-  if (txForm) {
-    txForm.addEventListener("submit", async function(e) {
-      // Let original listener run first (it runs on bubble, we're also on bubble
-      // but added later — so we wait one tick)
-      await new Promise(r => setTimeout(r, 0));
-      if (!_useCloud) return;
-      if (editingTxId !== null) {
-        // editingTxId was already reset to null by original, use last-known
-        // FIX: we capture editingTxId BEFORE original resets it via a separate listener
-      } else {
-        // "add" path — last item in array is the one just added
-        var newest = data.transactions[data.transactions.length - 1];
-        if (newest) await cloudSyncTx("add", null, newest);
-      }
-    });
-  }
-
-  /* ── all-transactions list click (edit / delete tx) ─────── */
-  var allTxEl = document.getElementById("all-transactions");
-  if (allTxEl) {
-    allTxEl.addEventListener("click", async function(e) {
-      await new Promise(r => setTimeout(r, 0));
-      if (!_useCloud) return;
-      var delId = e.target.dataset.deleteTx;
-      if (delId) await cloudSyncTx("delete", delId, null);
-    });
-  }
-
-  /* ── Installment form (add) ──────────────────────────────── */
-  var instForm = document.getElementById("installment-form");
-  if (instForm) {
-    instForm.addEventListener("submit", async function(e) {
-      await new Promise(r => setTimeout(r, 0));
-      if (!_useCloud) return;
-      var newest = data.installments[data.installments.length - 1];
-      if (newest) await cloudSyncInst("add", null, newest);
-    });
-  }
-
-  /* ── Installment list click (update paidCount / delete / edit) */
-  var instListEl = document.getElementById("installment-list");
-  if (instListEl) {
-    instListEl.addEventListener("click", async function(e) {
-      await new Promise(r => setTimeout(r, 0));
-      if (!_useCloud) return;
-      var delEl = e.target.closest("[data-delete-installment]");
-      if (delEl) await cloudSyncInst("delete", delEl.dataset.deleteInstallment, null);
-    });
-  }
-
-  /* ── Payment form (update paidCount) ────────────────────── */
-  var payForm = document.getElementById("payment-form");
-  if (payForm) {
-    payForm.addEventListener("submit", async function(e) {
-      await new Promise(r => setTimeout(r, 0));
-      if (!_useCloud) return;
-      var form = new FormData(payForm);
-      var id   = form.get ? form.get("id") : null;
-      if (!id) { id = document.getElementById("payment-item-id")?.value; }
-      var inst = data.installments.find(function(x) { return x.id === id; });
-      if (inst) await cloudSyncInst("update", id, inst);
-    });
-  }
-
-  /* ── Note form (add) ─────────────────────────────────────── */
-  var noteForm = document.getElementById("note-form");
-  if (noteForm) {
-    noteForm.addEventListener("submit", async function(e) {
-      await new Promise(r => setTimeout(r, 0));
-      if (!_useCloud) return;
-      var newest = data.notes[0]; // notes sorted desc, newest is first after re-sort? check:
-      // Actually data.notes is push()ed, so newest is last
-      var n = data.notes[data.notes.length - 1];
-      if (n) await cloudSyncNote("add", null, n);
-    });
-  }
-
-  /* ── Notes list click (delete) ───────────────────────────── */
-  var notesListEl = document.getElementById("notes-list");
-  if (notesListEl) {
-    notesListEl.addEventListener("click", async function(e) {
-      await new Promise(r => setTimeout(r, 0));
-      if (!_useCloud) return;
-      var id = e.target.dataset.deleteNote;
-      if (id) await cloudSyncNote("delete", id, null);
-    });
-  }
-})();
-
-/* ── Capture editingTxId BEFORE original listener resets it ─ */
-(function captureEditingTxId() {
-  var txForm = document.getElementById("transaction-form");
-  if (!txForm) return;
-  var _capturedEditId = null;
-  // We add a capture-phase listener to grab it before anything runs
-  txForm.addEventListener("submit", function(e) {
-    _capturedEditId = editingTxId; // grab current value
-  }, true);
-  // Then a post-submit listener to do the cloud update
-  txForm.addEventListener("submit", async function(e) {
-    await new Promise(r => setTimeout(r, 0));
-    if (!_useCloud || !_capturedEditId) { _capturedEditId = null; return; }
-    var tx = data.transactions.find(function(t) { return t.id === _capturedEditId; });
-    if (tx) await cloudSyncTx("update", _capturedEditId, tx);
-    _capturedEditId = null;
-  });
-})();
-
 /* ══════════════════════════════════════════════════════════════
    ON AUTH STATE CHANGE — main orchestrator
    ══════════════════════════════════════════════════════════════ */
@@ -1311,11 +1228,17 @@ document.addEventListener("supabase:ready", async function() {
   /* Listen for login / logout events */
   window.SupabaseAuth.onAuthChange(async function(event, user) {
     if (user) {
+      var isSameUser = _currentUser && _currentUser.id === user.id;
       _currentUser = user;
       _useCloud    = true;
       closeModal("auth-modal");
       updateProfileChip(user);
       updateSafeCard(true);
+
+      // If already connected and just a background token refresh or user update, skip full reload/resubscribe
+      if (isSameUser && (event === "TOKEN_REFRESHED" || event === "USER_UPDATED")) {
+        return;
+      }
 
       showCloudLoader("กำลังโหลดข้อมูลจาก Cloud…");
       try {

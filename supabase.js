@@ -158,6 +158,13 @@ const SupabaseDB = {
     if (error) throw error;
     return _noteFromDB(data);
   },
+  async updateNote(id, note) {
+    const [c, user] = await _cu(); _requireUser(user);
+    const { data, error } = await c.from("notes")
+      .update(_noteToDB(note, user.id)).eq("id", id).eq("user_id", user.id).select().single();
+    if (error) throw error;
+    return _noteFromDB(data);
+  },
   async deleteNote(id) {
     const [c, user] = await _cu(); _requireUser(user);
     const { error } = await c.from("notes").delete().eq("id", id).eq("user_id", user.id);
@@ -181,23 +188,49 @@ const SupabaseDB = {
 const SupabaseRealtime = {
   _channels: [],
   async subscribe(userId, onChange) {
-    const c = await getClient();
-    ["transactions", "installments", "notes"].forEach(table => {
-      const ch = c.channel(`pb:${table}:${userId}`)
-        .on("postgres_changes",
-          { event: "*", schema: "public", table, filter: `user_id=eq.${userId}` },
-          payload => onChange(table, payload)
-        )
-        .subscribe((status) => {
-          if (status === "SUBSCRIBED") console.log(`✅ Realtime: ${table} subscribed`);
-        });
-      this._channels.push(ch);
-    });
+    try {
+      await this.unsubscribeAll();
+      const c = await getClient();
+      const tables = ["transactions", "installments", "notes"];
+      for (const table of tables) {
+        const channelName = `pb:${table}:${userId}`;
+        try {
+          const existing = (c.getChannels ? c.getChannels() : []).find(ch => ch.topic === `realtime:${channelName}` || ch.name === channelName);
+          if (existing) {
+            await c.removeChannel(existing);
+          }
+        } catch (_) {}
+
+        const ch = c.channel(channelName)
+          .on("postgres_changes",
+            { event: "*", schema: "public", table, filter: `user_id=eq.${userId}` },
+            payload => onChange(table, payload)
+          )
+          .subscribe((status) => {
+            if (status === "SUBSCRIBED") console.log(`✅ Realtime: ${table} subscribed`);
+          });
+        this._channels.push(ch);
+      }
+    } catch (err) {
+      console.warn("SupabaseRealtime.subscribe warning:", err.message);
+    }
   },
   async unsubscribeAll() {
     try {
       const c = await getClient();
-      this._channels.forEach(ch => c.removeChannel(ch));
+      if (this._channels.length) {
+        for (const ch of this._channels) {
+          try { await c.removeChannel(ch); } catch (_) {}
+        }
+      }
+      try {
+        const channels = c.getChannels ? c.getChannels() : [];
+        for (const ch of channels) {
+          if (ch.topic && ch.topic.startsWith("realtime:pb:")) {
+            try { await c.removeChannel(ch); } catch (_) {}
+          }
+        }
+      } catch (_) {}
     } catch (_) {}
     this._channels = [];
   }
