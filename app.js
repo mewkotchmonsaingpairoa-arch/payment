@@ -208,7 +208,12 @@ function monthlyTransactions(month) {
   month = month || selectedMonth;
   var manual = data.transactions.filter(function(tx) { return tx.date.slice(0, 7) === month; });
   return manual.concat(installmentsForMonth(month))
-    .sort(function(a, b) { return b.date.localeCompare(a.date); });
+    .sort(function(a, b) {
+      var typeA = a.type === "income" ? 0 : 1;
+      var typeB = b.type === "income" ? 0 : 1;
+      if (typeA !== typeB) return typeA - typeB;
+      return b.date.localeCompare(a.date);
+    });
 }
 
 function monthlyTotals() {
