@@ -476,7 +476,14 @@ function renderInstallments() {
     return;
   }
 
-  _id("installment-list").innerHTML = data.installments.map(function(item) {
+  var sorted = data.installments.slice().sort(function(a, b) {
+    var aDone = paidInstallments(a) >= a.months ? 1 : 0;
+    var bDone = paidInstallments(b) >= b.months ? 1 : 0;
+    if (aDone !== bDone) return aDone - bDone;
+    return (a.startMonth || "").localeCompare(b.startMonth || "");
+  });
+
+  _id("installment-list").innerHTML = sorted.map(function(item) {
     var progress = paidInstallments(item);
     var isActive = validInstallmentForMonth(item, selectedMonth);
     var status   = progress >= item.months ? "ครบแล้ว"
@@ -488,7 +495,7 @@ function renderInstallments() {
     var pct      = Math.min((progress / item.months) * 100, 100).toFixed(1);
     var meta     = CATEGORY_META[item.category] || CATEGORY_META.other;
     var pillClass = progress >= item.months ? "pill pill-done" : "pill";
-    return '<article class="installment-card">'
+    return '<article class="installment-card' + (progress >= item.months ? ' installment-card-done' : '') + '">'
       + '<div class="installment-card-top">'
         + '<div class="installment-card-title">'
           + '<span class="transaction-icon installment">' + meta.icon + '</span>'

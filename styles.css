@@ -162,6 +162,8 @@ body::before { animation: sparkle-drift 6s ease-in-out infinite; } body::after {
 /* ─── Pill variant for completed installments ───────────────── */
 .pill-done { color: #6b6b6b; background: #f0f0f0; }
 .desktop-frame .pill-done { color: #8b8b8b; background: #ede9f3; }
+.installment-card-done { opacity: 0.75; transition: opacity .2s ease; }
+.installment-card-done:hover { opacity: 1; }
 
 /* ─── Profile sign-out button ───────────────────────────────── */
 .profile { flex-wrap: wrap; overflow: visible !important; }
