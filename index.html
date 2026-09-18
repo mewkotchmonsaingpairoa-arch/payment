@@ -6,7 +6,7 @@
     <title>PocketBloom — เกมจัดการเงิน</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="apple-touch-icon" href="favicon.svg" />
-    <link rel="stylesheet" href="styles.css?v=6" />
+    <link rel="stylesheet" href="styles.css?v=7" />
   </head>
   <body>
     <div class="desktop-frame">
@@ -160,7 +160,7 @@
       <form class="modal" id="transaction-form">
         <div class="modal-title"><div><p class="eyebrow">บันทึกรายการ</p><h2 id="tx-modal-title">เพิ่มรายรับหรือรายจ่าย</h2></div><button type="button" class="close" data-close="transaction-modal">×</button></div>
         <label>ประเภทรายการ <div class="segmented"><input type="radio" name="transactionType" value="expense" id="type-expense" checked><label for="type-expense">รายจ่าย</label><input type="radio" name="transactionType" value="income" id="type-income"><label for="type-income">รายรับ</label></div></label>
-        <div class="form-grid"><label>ชื่อรายการ<input required name="title" placeholder="เช่น ค่าอาหาร" maxlength="48" /></label><label>จำนวนเงิน<input required name="amount" type="number" min="1" step="1" placeholder="0" inputmode="decimal" /></label><label>หมวดหมู่<div class="category-select-row"><select name="category" id="transaction-category"></select><button type="button" id="open-manage-categories" data-open-categories class="btn-manage-cat" title="จัดการหมวดหมู่">⚙</button></div></label><label>วันที่<input required name="date" id="transaction-date" type="date" /></label></div>
+        <div class="form-grid"><label>ชื่อรายการ<input required name="title" placeholder="เช่น ค่าอาหาร" maxlength="48" /></label><label>จำนวนเงิน<input required name="amount" type="number" min="0.01" step="any" placeholder="0.00" inputmode="decimal" /></label><label>หมวดหมู่<div class="category-select-row"><select name="category" id="transaction-category"></select><button type="button" id="open-manage-categories" data-open-categories class="btn-manage-cat" title="จัดการหมวดหมู่">⚙</button></div></label><label>วันที่<input required name="date" id="transaction-date" type="date" /></label></div>
         <label>หมายเหตุ <textarea name="note" placeholder="เพิ่มรายละเอียด (ไม่บังคับ)" maxlength="100"></textarea></label>
         <div class="modal-actions"><button type="button" class="button ghost" data-close="transaction-modal">ยกเลิก</button><button class="button primary" id="tx-submit-btn" type="submit">บันทึกรายการ</button></div>
       </form>
@@ -173,10 +173,10 @@
         <div class="form-grid">
           <label>ชื่อรายการ<input required name="title" placeholder="เช่น ผ่อนโทรศัพท์" maxlength="48" /></label>
           <label>ยอดผ่อนต่องวด
-            <input name="amount" id="inst-amount" type="number" min="1" step="0.01" placeholder="700" inputmode="decimal" />
+            <input name="amount" id="inst-amount" type="number" min="0.01" step="any" placeholder="700" inputmode="decimal" />
           </label>
           <label>ยอดรวมทั้งหมด
-            <input name="totalAmount" id="inst-total" type="number" min="1" step="0.01" placeholder="คำนวณอัตโนมัติ" inputmode="decimal" />
+            <input name="totalAmount" id="inst-total" type="number" min="0.01" step="any" placeholder="คำนวณอัตโนมัติ" inputmode="decimal" />
           </label>
           <label>จำนวนงวดทั้งหมด<input required name="months" id="inst-months" type="number" min="1" max="120" step="1" value="12" /></label>
           <label>ผ่อนแล้วกี่งวด<input required name="paidCount" type="number" min="0" max="120" step="1" value="0" /></label>
@@ -300,8 +300,8 @@
     <!-- ════════════════════════════════════════════════════════ -->
 
     <!-- Config loaded from external file (CSP-safe, no inline scripts) -->
-    <script src="config.js?v=6"></script>
-    <script src="supabase.js?v=6"></script>
-    <script src="app.js?v=6"></script>
+    <script src="config.js?v=7"></script>
+    <script src="supabase.js?v=7"></script>
+    <script src="app.js?v=7"></script>
   </body>
 </html>

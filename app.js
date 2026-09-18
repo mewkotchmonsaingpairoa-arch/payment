@@ -119,7 +119,11 @@ function monthDiff(start, end) {
 }
 function money(v, sign) {
   sign = sign || "";
-  return sign + "฿" + Number(v || 0).toLocaleString("th-TH", { maximumFractionDigits: 0 });
+  var num = Number(v || 0);
+  return sign + "฿" + num.toLocaleString("th-TH", {
+    minimumFractionDigits: Number.isInteger(num) ? 0 : 2,
+    maximumFractionDigits: 2
+  });
 }
 function monthLabel(val) {
   val = val || selectedMonth;
@@ -692,11 +696,12 @@ _id("transaction-form").addEventListener("submit", function(e) {
   var form   = new FormData(e.currentTarget);
   var type   = form.get("transactionType");
   var title  = form.get("title").trim();
-  var amount = Number(form.get("amount"));
+  var amount = parseFloat(form.get("amount"));
   var cat    = form.get("category");
   var date   = form.get("date");
   var note   = form.get("note").trim();
-  if (!title || amount <= 0 || !date) { toast("⚠️ กรุณากรอกข้อมูลให้ครบถ้วน"); return; }
+  if (!title || isNaN(amount) || amount <= 0 || !date) { toast("⚠️ กรุณากรอกข้อมูลให้ครบถ้วน"); return; }
+  amount = Math.round(amount * 100) / 100;
   if (editingTxId) {
     var editId = editingTxId;
     var idx = data.transactions.findIndex(function(t) { return String(t.id) === String(editId); });
@@ -861,7 +866,7 @@ _id("installment-form").addEventListener("submit", function(e) {
   var startMonth = form.get("startMonth");
   var category   = form.get("category");
   /* Resolve amount: prefer per-installment; fall back to total / months */
-  var amount = amtRaw > 0 ? amtRaw
+  var amount = amtRaw > 0 ? Math.round(amtRaw * 100) / 100
              : (totRaw > 0 && months > 0) ? Math.round((totRaw / months) * 100) / 100
              : 0;
   if (!title || amount <= 0 || months <= 0 || !startMonth) {
