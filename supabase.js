@@ -283,8 +283,8 @@ function _requireUser(user) {
   if (!user) throw new Error("ยังไม่ได้เข้าสู่ระบบ");
 }
 
-function _txToDB(tx, uid)  { return { user_id: uid, type: tx.type, title: tx.title, amount: +tx.amount, category: tx.category, date: tx.date, note: tx.note || "" }; }
-function _txFromDB(r)      { return { id: r.id, type: r.type, title: r.title, amount: +r.amount, category: r.category, date: r.date, note: r.note || "" }; }
+function _txToDB(tx, uid)  { return { user_id: uid, type: tx.type, title: tx.title, amount: +tx.amount, category: tx.category, date: tx.date, note: tx.note || "", is_paid: tx.type === "expense" ? Boolean(tx.is_paid) : false }; }
+function _txFromDB(r)      { return { id: r.id, type: r.type, title: r.title, amount: +r.amount, category: r.category, date: r.date, note: r.note || "", is_paid: Boolean(r.is_paid) }; }
 
 function _instToDB(i, uid) { return { user_id: uid, title: i.title, amount: +i.amount, months: +i.months, paid_count: +(i.paidCount||0), start_month: i.startMonth, category: i.category }; }
 function _instFromDB(r)    { return { id: r.id, title: r.title, amount: +r.amount, months: +r.months, paidCount: +(r.paid_count||0), startMonth: r.start_month, category: r.category }; }

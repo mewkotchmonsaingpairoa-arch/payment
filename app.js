@@ -349,21 +349,60 @@ document.addEventListener("click", function(e) {
 
 /* ─── Render: transaction row ────────────────────────────────── */
 function renderTransactionRow(item, withActions) {
-  var meta    = CATEGORY_META[item.category] || CATEGORY_META.other;
-  var income  = item.type === "income";
-  var srcTag  = item.source
+  var meta      = CATEGORY_META[item.category] || CATEGORY_META.other;
+  var income    = item.type === "income";
+  var isExpense = item.type === "expense";
+  
+  var isPaid = false;
+  if (isExpense) {
+    if (item.source === "installment") {
+      isPaid = paidInstallments(item.installment) >= item.installmentNumber;
+    } else {
+      isPaid = item.is_paid === true;
+    }
+  }
+
+  var checkboxHtml = "";
+  if (isExpense) {
+    if (item.source === "installment") {
+      checkboxHtml = '<label class="tx-paid-toggle" title="' + (isPaid ? 'จ่ายแล้ว (คลิกเพื่อยกเลิกงวดที่ ' + item.installmentNumber + ')' : 'ยังไม่จ่าย (คลิกเพื่อบันทึกจ่ายงวดที่ ' + item.installmentNumber + '/' + item.installment.months + ')') + '">'
+        + '<input type="checkbox" class="tx-paid-chk" ' + (isPaid ? 'checked' : '') + ' data-toggle-inst-pay="' + item.installment.id + '" data-inst-num="' + item.installmentNumber + '" aria-label="สถานะจ่ายแล้ว">'
+        + '<span class="tx-custom-checkbox"><svg class="tx-check-icon" viewBox="0 0 12 10"><polyline points="1.5 5 4.5 8 10.5 2"></polyline></svg></span>'
+        + '</label>';
+    } else {
+      checkboxHtml = '<label class="tx-paid-toggle" title="' + (isPaid ? 'จ่ายแล้ว (คลิกเพื่อเปลี่ยน)' : 'ยังไม่จ่าย (คลิกเพื่อบันทึกว่าจ่ายแล้ว)') + '">'
+        + '<input type="checkbox" class="tx-paid-chk" ' + (isPaid ? 'checked' : '') + ' data-toggle-tx-pay="' + item.id + '" aria-label="สถานะจ่ายแล้ว">'
+        + '<span class="tx-custom-checkbox"><svg class="tx-check-icon" viewBox="0 0 12 10"><polyline points="1.5 5 4.5 8 10.5 2"></polyline></svg></span>'
+        + '</label>';
+    }
+  } else {
+    checkboxHtml = '<span class="tx-paid-placeholder"></span>';
+  }
+
+  var paidBadge = isExpense
+    ? (isPaid
+        ? '<span class="tx-status-badge is-paid" title="ชำระเงินเรียบร้อยแล้ว">✓ จ่ายแล้ว</span>'
+        : '<span class="tx-status-badge is-unpaid" title="ยังไม่ได้ชำระ">รอจ่าย</span>')
+    : "";
+
+  var srcTag = item.source
     ? '<span class="source-tag">งวด ' + item.installmentNumber + '/' + item.installment.months + '</span>'
     : "";
+
   var actions = (!item.source && withActions)
     ? '<div class="tx-actions">'
       + '<button class="tx-edit-btn" data-edit-tx="' + item.id + '" title="แก้ไข">✎</button>'
       + '<button class="tx-delete-btn" data-delete-tx="' + item.id + '" title="ลบ">✕</button>'
       + '</div>'
     : "";
-  return '<div class="transaction-row">'
+
+  var rowClass = "transaction-row " + (isExpense ? (isPaid ? "tx-row-paid" : "tx-row-unpaid") : "tx-row-income");
+
+  return '<div class="' + rowClass + '">'
+    + checkboxHtml
     + '<span class="transaction-icon ' + (income ? "income" : item.source ? "installment" : "") + '">' + meta.icon + '</span>'
     + '<div class="transaction-main">'
-    + '<strong>' + escapeHtml(item.title) + srcTag + '</strong>'
+    + '<div class="tx-title-line"><strong>' + escapeHtml(item.title) + '</strong>' + srcTag + paidBadge + '</div>'
     + '<small>' + meta.label + (item.note ? ' · ' + escapeHtml(item.note) : "") + '</small>'
     + '</div>'
     + '<span class="transaction-amount ' + (income ? "income" : "expense") + '">' + money(item.amount, income ? "+" : "−") + '</span>'
@@ -461,11 +500,24 @@ function renderTxSummary() {
 /* ─── Render: All transactions ───────────────────────────────── */
 function renderAllTransactions() {
   var list = monthlyTransactions().filter(function(tx) {
-    return txFilter === "all" || tx.type === txFilter;
+    if (txFilter === "all") return true;
+    if (txFilter === "income") return tx.type === "income";
+    if (txFilter === "expense") return tx.type === "expense";
+    if (txFilter === "unpaid") {
+      if (tx.type !== "expense") return false;
+      if (tx.source === "installment") return paidInstallments(tx.installment) < tx.installmentNumber;
+      return tx.is_paid !== true;
+    }
+    if (txFilter === "paid") {
+      if (tx.type !== "expense") return false;
+      if (tx.source === "installment") return paidInstallments(tx.installment) >= tx.installmentNumber;
+      return tx.is_paid === true;
+    }
+    return true;
   });
   _id("all-transactions").innerHTML = list.length
     ? list.map(function(item) { return renderTransactionRow(item, true); }).join("")
-    : emptyMarkup("ไม่พบรายการประเภทนี้ในเดือนที่เลือก");
+    : emptyMarkup("ไม่พบรายการตามเงื่อนไขที่เลือกในเดือนนี้");
   renderTxSummary();
 }
 
@@ -495,6 +547,9 @@ function renderInstallments() {
   _id("installment-list").innerHTML = sorted.map(function(item) {
     var progress = paidInstallments(item);
     var isActive = validInstallmentForMonth(item, selectedMonth);
+    var curMonthNum = monthDiff(item.startMonth, selectedMonth) + 1;
+    var isMonthPaid = progress >= curMonthNum;
+
     var status   = progress >= item.months ? "ครบแล้ว"
                  : isActive                ? "กำลังผ่อน"
                  : monthDiff(item.startMonth, selectedMonth) < 0 ? "ยังไม่เริ่ม"
@@ -504,6 +559,17 @@ function renderInstallments() {
     var pct      = Math.min((progress / item.months) * 100, 100).toFixed(1);
     var meta     = CATEGORY_META[item.category] || CATEGORY_META.other;
     var pillClass = progress >= item.months ? "pill pill-done" : "pill";
+
+    var monthPayBanner = isActive
+      ? ('<div class="installment-month-check ' + (isMonthPaid ? 'is-paid' : 'is-unpaid') + '">'
+          + '<label class="inst-month-chk-label" title="' + (isMonthPaid ? 'งวดนี้จ่ายแล้ว (คลิกเพื่อยกเลิก)' : 'คลิกเพื่อบันทึกจ่ายงวดที่ ' + curMonthNum + ' ของ ' + monthLabel()) + '">'
+            + '<input type="checkbox" class="tx-paid-chk" data-toggle-inst-pay="' + item.id + '" data-inst-num="' + curMonthNum + '" ' + (isMonthPaid ? 'checked' : '') + '>'
+            + '<span class="tx-custom-checkbox"><svg class="tx-check-icon" viewBox="0 0 12 10"><polyline points="1.5 5 4.5 8 10.5 2"></polyline></svg></span>'
+            + '<span class="inst-month-text">งวด' + monthLabel() + ' (งวดที่ ' + curMonthNum + '/' + item.months + '): <strong>' + (isMonthPaid ? '✓ จ่ายแล้ว' : '⏳ รอชำระ') + '</strong></span>'
+          + '</label>'
+        + '</div>')
+      : '';
+
     return '<article class="installment-card' + (progress >= item.months ? ' installment-card-done' : '') + '">'
       + '<div class="installment-card-top">'
         + '<div class="installment-card-title">'
@@ -512,6 +578,7 @@ function renderInstallments() {
         + '</div>'
         + '<span class="' + pillClass + '">' + status + '</span>'
       + '</div>'
+      + monthPayBanner
       + '<div class="installment-price"><strong>' + money(item.amount) + ' <span>/ เดือน</span></strong><span>ผ่อนแล้ว ' + progress + '/' + item.months + ' งวด</span></div>'
       + '<div class="progress"><i style="width:' + pct + '%"></i></div>'
       + '<div class="installment-meta"><span>ชำระแล้ว ' + money(paidAmt) + ' · ' + progress + ' งวด</span><span>เหลือ ' + money(leftAmt) + '</span></div>'
@@ -647,7 +714,13 @@ document.addEventListener("keydown", function(e) {
 /* Transaction category repopulate when type changes */
 var txCategoryEl = _id("transaction-category");
 document.querySelectorAll('input[name="transactionType"]').forEach(function(radio) {
-  radio.addEventListener("change", function(e) { populateCategories(txCategoryEl, e.target.value); });
+  radio.addEventListener("change", function(e) {
+    populateCategories(txCategoryEl, e.target.value);
+    var paidWrap = _id("tx-paid-toggle-wrap");
+    if (paidWrap) {
+      paidWrap.style.display = e.target.value === "expense" ? "block" : "none";
+    }
+  });
 });
 
 /* Filter buttons — scoped to transactions page only */
@@ -669,6 +742,12 @@ function openAddTransaction() {
   form.querySelector('input[value="expense"]').checked = true;
   populateCategories(txCategoryEl, "expense");
   _id("transaction-date").value = selectedMonth + "-01";
+  
+  var paidChk = _id("tx-is-paid");
+  if (paidChk) paidChk.checked = true;
+  var paidWrap = _id("tx-paid-toggle-wrap");
+  if (paidWrap) paidWrap.style.display = "block";
+
   _id("tx-modal-title").textContent = "เพิ่มรายรับหรือรายจ่าย";
   _id("tx-submit-btn").textContent  = "บันทึกรายการ";
   openModal("transaction-modal");
@@ -688,6 +767,12 @@ function openEditTransaction(id) {
   form.querySelector('[name="note"]').value   = item.note || "";
   _id("transaction-date").value = item.date;
   txCategoryEl.value = item.category;
+
+  var paidChk = _id("tx-is-paid");
+  if (paidChk) paidChk.checked = item.is_paid !== false;
+  var paidWrap = _id("tx-paid-toggle-wrap");
+  if (paidWrap) paidWrap.style.display = item.type === "expense" ? "block" : "none";
+
   _id("tx-modal-title").textContent = "แก้ไขรายการ";
   _id("tx-submit-btn").textContent  = "บันทึกการแก้ไข";
   openModal("transaction-modal");
@@ -705,18 +790,20 @@ _id("transaction-form").addEventListener("submit", function(e) {
   var cat    = form.get("category");
   var date   = form.get("date");
   var note   = form.get("note").trim();
+  var isPaid = type === "expense" ? (form.get("isPaid") === "on") : false;
+
   if (!title || isNaN(amount) || amount <= 0 || !date) { toast("⚠️ กรุณากรอกข้อมูลให้ครบถ้วน"); return; }
   amount = Math.round(amount * 100) / 100;
   if (editingTxId) {
     var editId = editingTxId;
     var idx = data.transactions.findIndex(function(t) { return String(t.id) === String(editId); });
     if (idx !== -1) {
-      data.transactions[idx] = { id: editId, type: type, title: title, amount: amount, category: cat, date: date, note: note };
+      data.transactions[idx] = { id: editId, type: type, title: title, amount: amount, category: cat, date: date, note: note, is_paid: isPaid };
       cloudSyncTx("update", editId, data.transactions[idx]);
     }
     toast("แก้ไขรายการเรียบร้อยแล้ว");
   } else {
-    var newTx = { id: uid(), type: type, title: title, amount: amount, category: cat, date: date, note: note };
+    var newTx = { id: uid(), type: type, title: title, amount: amount, category: cat, date: date, note: note, is_paid: isPaid };
     data.transactions.push(newTx);
     selectedMonth = date.slice(0, 7);
     cloudSyncTx("add", null, newTx);
@@ -727,7 +814,48 @@ _id("transaction-form").addEventListener("submit", function(e) {
   closeModal("transaction-modal");
 });
 
-/* Edit / Delete handler (shared between dashboard list and all-transactions list) */
+/* Checkbox Payment Toggle Handler (Works for both manual expenses and installments) */
+function handlePaymentCheckboxChange(e) {
+  var payInput = e.target.closest("[data-toggle-tx-pay]");
+  if (payInput) {
+    var txId = payInput.dataset.toggleTxPay;
+    var tx = data.transactions.find(function(t) { return String(t.id) === String(txId); });
+    if (tx) {
+      tx.is_paid = payInput.checked;
+      cloudSyncTx("update", tx.id, tx);
+      saveData();
+      render();
+      toast(tx.is_paid ? "✅ บันทึกว่าจ่ายแล้ว: " + tx.title : "⚪ เปลี่ยนเป็นยังไม่จ่าย: " + tx.title);
+    }
+    return;
+  }
+
+  var instPayInput = e.target.closest("[data-toggle-inst-pay]");
+  if (instPayInput) {
+    var instId  = instPayInput.dataset.toggleInstPay;
+    var instNum = parseInt(instPayInput.dataset.instNum, 10);
+    var inst    = data.installments.find(function(i) { return String(i.id) === String(instId); });
+    if (inst) {
+      var isChecked = instPayInput.checked;
+      if (isChecked) {
+        // เมื่อกดจ่ายแล้ว -> อัปเดตผ่อนแล้วให้ถึงงวดนี้เป็นอย่างน้อย
+        inst.paidCount = Math.min(inst.months, Math.max(paidInstallments(inst), instNum));
+      } else {
+        // เมื่อเอาติ๊กออก -> ถอยงวดที่ผ่อนแล้วลง
+        inst.paidCount = Math.max(0, Math.min(paidInstallments(inst), instNum - 1));
+      }
+      cloudSyncInst("update", inst.id, inst);
+      saveData();
+      render();
+      toast(isChecked
+        ? "✅ อัปเดตผ่อนชำระ: จ่ายงวดที่ " + instNum + "/" + inst.months + " แล้ว (" + inst.title + ")"
+        : "⚪ ปรับสถานะผ่อนชำระ: ยกเลิกงวดที่ " + instNum + " (" + inst.title + ")");
+    }
+    return;
+  }
+}
+
+/* Edit / Delete action buttons handler */
 function handleTxListClick(e) {
   var delBtn  = e.target.closest("[data-delete-tx]");
   var editBtn = e.target.closest("[data-edit-tx]");
@@ -745,11 +873,14 @@ function handleTxListClick(e) {
   }
 }
 
-/* Edit / Delete from all-transactions list */
+/* Bind toggle & action events */
 _id("all-transactions").addEventListener("click", handleTxListClick);
+_id("all-transactions").addEventListener("change", handlePaymentCheckboxChange);
 
-/* Edit / Delete from dashboard monthly-transactions list */
 _id("monthly-transactions").addEventListener("click", handleTxListClick);
+_id("monthly-transactions").addEventListener("change", handlePaymentCheckboxChange);
+
+_id("installment-list").addEventListener("change", handlePaymentCheckboxChange);
 
 /* ─── Installment modal — auto-calculation ───────────────────── */
 var _instCalcLock = false;   /* prevent circular update */
@@ -1312,3 +1443,492 @@ _id("signout-btn").addEventListener("click", handleSignOut);
 _id("auth-tab-login").addEventListener("click", function() { authSwitchTab("login"); });
 _id("auth-tab-signup").addEventListener("click", function() { authSwitchTab("signup"); });
 _id("auth-offline-link").addEventListener("click", function(e) { useOfflineMode(e); });
+
+/* ══════════════════════════════════════════════════════════════
+   FLOATING DRAGGABLE CALCULATOR
+   ══════════════════════════════════════════════════════════════ */
+(function initFloatingCalculator() {
+  var calcEl      = _id("floating-calculator");
+  var handleEl    = _id("calc-drag-handle");
+  var displayEl   = _id("calc-current");
+  var historyEl   = _id("calc-history");
+  var minBtn      = _id("calc-min-btn");
+  var minDot      = _id("calc-min-dot");
+  var closeBtn    = _id("calc-close-btn");
+  var closeDot    = _id("calc-close-dot");
+  var resetDot    = _id("calc-reset-pos-dot");
+  var fabBtn      = _id("calc-fab-btn");
+  var openSidebar = _id("open-calc-sidebar");
+  var openTopbar  = _id("open-calc-topbar");
+  var copyBtn     = _id("calc-copy-btn");
+  var applyBtn    = _id("calc-apply-btn");
+
+  if (!calcEl) return;
+
+  var state = {
+    current: "0",
+    prev: null,
+    op: null,
+    overwrite: false,
+    historyText: "",
+    minimized: false,
+    visible: false
+  };
+
+  function updateDisplay() {
+    if (displayEl) {
+      var val = state.current;
+      var num = parseFloat(val);
+      if (!isNaN(num) && !val.endsWith(".") && !val.includes("e")) {
+        var parts = val.split(".");
+        var intPart = Number(parts[0]).toLocaleString("th-TH");
+        displayEl.textContent = parts.length > 1 ? intPart + "." + parts[1] : intPart;
+      } else {
+        displayEl.textContent = val || "0";
+      }
+    }
+    if (historyEl) {
+      historyEl.textContent = state.historyText || "\u00A0";
+    }
+  }
+
+  function inputDigit(d) {
+    if (state.overwrite || state.current === "0") {
+      state.current = d === "00" ? "0" : d;
+      state.overwrite = false;
+    } else {
+      if (state.current.length < 15) {
+        state.current += d;
+      }
+    }
+    updateDisplay();
+  }
+
+  function inputDot() {
+    if (state.overwrite) {
+      state.current = "0.";
+      state.overwrite = false;
+    } else if (state.current.indexOf(".") === -1) {
+      state.current += ".";
+    }
+    updateDisplay();
+  }
+
+  function clearAll() {
+    state.current = "0";
+    state.prev = null;
+    state.op = null;
+    state.overwrite = false;
+    state.historyText = "";
+    updateDisplay();
+  }
+
+  function backspace() {
+    if (state.overwrite) {
+      state.current = "0";
+      state.overwrite = false;
+    } else if (state.current.length > 1) {
+      state.current = state.current.slice(0, -1);
+    } else {
+      state.current = "0";
+    }
+    updateDisplay();
+  }
+
+  function calculate(a, b, op) {
+    a = Number(a);
+    b = Number(b);
+    switch (op) {
+      case "+": return a + b;
+      case "-": return a - b;
+      case "*": return a * b;
+      case "/": return b === 0 ? "Error" : a / b;
+      default: return b;
+    }
+  }
+
+  function opSymbol(op) {
+    switch (op) {
+      case "+": return "＋";
+      case "-": return "−";
+      case "*": return "×";
+      case "/": return "÷";
+      default: return op;
+    }
+  }
+
+  function handleOp(nextOp) {
+    var curVal = parseFloat(state.current);
+    if (isNaN(curVal)) curVal = 0;
+
+    if (state.prev !== null && state.op && !state.overwrite) {
+      var res = calculate(state.prev, curVal, state.op);
+      if (res === "Error") {
+        state.current = "Error";
+        state.prev = null;
+        state.op = null;
+        state.overwrite = true;
+        state.historyText = "หารด้วย 0 ไม่ได้";
+        updateDisplay();
+        return;
+      }
+      res = Math.round(res * 100000000) / 100000000;
+      state.current = String(res);
+      state.prev = res;
+      state.historyText = state.current + " " + opSymbol(nextOp);
+    } else {
+      state.prev = curVal;
+      state.historyText = state.current + " " + opSymbol(nextOp);
+    }
+
+    state.op = nextOp;
+    state.overwrite = true;
+    updateDisplay();
+  }
+
+  function handleEqual() {
+    if (state.op === null || state.prev === null) return;
+    var curVal = parseFloat(state.current);
+    if (isNaN(curVal)) curVal = 0;
+
+    var res = calculate(state.prev, curVal, state.op);
+    if (res === "Error") {
+      state.current = "Error";
+      state.historyText = "หารด้วย 0 ไม่ได้";
+    } else {
+      res = Math.round(res * 100000000) / 100000000;
+      state.historyText = state.prev + " " + opSymbol(state.op) + " " + curVal + " =";
+      state.current = String(res);
+    }
+    state.prev = null;
+    state.op = null;
+    state.overwrite = true;
+    updateDisplay();
+  }
+
+  function handlePercent() {
+    var curVal = parseFloat(state.current);
+    if (isNaN(curVal)) return;
+    if (state.prev !== null && state.op) {
+      var pctVal = (state.prev * curVal) / 100;
+      state.current = String(Math.round(pctVal * 100000000) / 100000000);
+    } else {
+      state.current = String(curVal / 100);
+    }
+    updateDisplay();
+  }
+
+  // Keypad click delegation
+  calcEl.addEventListener("click", function(e) {
+    var key = e.target.closest(".calc-key");
+    if (!key) return;
+    var action = key.dataset.calcAction;
+    var val = key.dataset.calcVal;
+
+    if (val !== undefined && action === undefined) {
+      if (val === ".") inputDot();
+      else inputDigit(val);
+    } else if (action === "op") {
+      handleOp(val);
+    } else if (action === "equal") {
+      handleEqual();
+    } else if (action === "clear") {
+      clearAll();
+    } else if (action === "backspace") {
+      backspace();
+    } else if (action === "percent") {
+      handlePercent();
+    }
+  });
+
+  // Copy result
+  if (copyBtn) {
+    copyBtn.addEventListener("click", function() {
+      var text = state.current;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+          toast("📋 คัดลอก " + text + " แล้ว");
+        }).catch(function() {
+          toast("ยอดปัจจุบัน: " + text);
+        });
+      } else {
+        toast("ยอดปัจจุบัน: " + text);
+      }
+    });
+  }
+
+  // Apply to active form
+  if (applyBtn) {
+    applyBtn.addEventListener("click", function() {
+      var num = parseFloat(state.current);
+      if (isNaN(num) || num <= 0) {
+        toast("⚠️ ยอดเงินต้องมากกว่า 0");
+        return;
+      }
+      var rounded = Math.round(num * 100) / 100;
+      
+      var txModal   = _id("transaction-modal");
+      var instModal = _id("installment-modal");
+      var payModal  = _id("payment-modal");
+
+      var applied = false;
+      if (txModal && txModal.classList.contains("open")) {
+        var txInput = txModal.querySelector('[name="amount"]');
+        if (txInput) { txInput.value = rounded; applied = true; }
+      } else if (instModal && instModal.classList.contains("open")) {
+        var instInput = _id("inst-amount");
+        if (instInput) {
+          instInput.value = rounded;
+          if (typeof updateInstCalcPreview === "function") updateInstCalcPreview();
+          applied = true;
+        }
+      } else if (payModal && payModal.classList.contains("open")) {
+        var payCount = _id("payment-paid-count");
+        if (payCount) { payCount.value = Math.floor(rounded); applied = true; }
+      }
+
+      if (applied) {
+        toast("✨ นำยอด ฿" + rounded.toLocaleString("th-TH") + " ใส่ในฟอร์มแล้ว");
+      } else {
+        openAddTransaction();
+        setTimeout(function() {
+          var input = document.querySelector('#transaction-modal [name="amount"]');
+          if (input) input.value = rounded;
+          toast("✨ ใส่ยอด ฿" + rounded.toLocaleString("th-TH") + " ในรายการใหม่แล้ว");
+        }, 120);
+      }
+    });
+  }
+
+  // Open / Close / Toggle / Minimize
+  function showCalculator() {
+    calcEl.style.display = "flex";
+    calcEl.classList.remove("calc-hidden");
+    calcEl.setAttribute("aria-hidden", "false");
+    state.visible = true;
+    if (fabBtn) fabBtn.classList.add("active");
+    ensureVisiblePosition();
+  }
+
+  function hideCalculator() {
+    calcEl.style.display = "none";
+    calcEl.classList.add("calc-hidden");
+    calcEl.setAttribute("aria-hidden", "true");
+    state.visible = false;
+    if (fabBtn) fabBtn.classList.remove("active");
+  }
+
+  function toggleCalculator() {
+    if (state.visible) hideCalculator();
+    else showCalculator();
+  }
+
+  function toggleMinimize() {
+    state.minimized = !state.minimized;
+    calcEl.classList.toggle("minimized", state.minimized);
+    if (minBtn) minBtn.textContent = state.minimized ? "＋" : "−";
+  }
+
+  function resetPosition() {
+    calcEl.style.left = "";
+    calcEl.style.top = "";
+    calcEl.style.right = "24px";
+    calcEl.style.bottom = "84px";
+    localStorage.removeItem("pb_calc_pos");
+    toast("📍 รีเซ็ตตำแหน่งเครื่องคิดเลขแล้ว");
+  }
+
+  if (fabBtn) fabBtn.addEventListener("click", toggleCalculator);
+  if (openSidebar) openSidebar.addEventListener("click", showCalculator);
+  if (openTopbar) openTopbar.addEventListener("click", showCalculator);
+  if (closeBtn) closeBtn.addEventListener("click", hideCalculator);
+  if (closeDot) closeDot.addEventListener("click", hideCalculator);
+  if (minBtn) minBtn.addEventListener("click", toggleMinimize);
+  if (minDot) minDot.addEventListener("click", toggleMinimize);
+  if (resetDot) resetDot.addEventListener("click", resetPosition);
+
+  // Dragging Engine (Pointer Events for Mouse & Touch)
+  var isDragging = false;
+  var startX, startY, startLeft, startTop;
+
+  function onPointerDown(e) {
+    if (e.target.closest("button") || e.target.closest(".calc-dot")) return;
+    isDragging = true;
+    handleEl.setPointerCapture(e.pointerId);
+
+    var rect = calcEl.getBoundingClientRect();
+    startLeft = rect.left;
+    startTop = rect.top;
+    startX = e.clientX;
+    startY = e.clientY;
+
+    calcEl.style.right = "auto";
+    calcEl.style.bottom = "auto";
+    calcEl.style.left = startLeft + "px";
+    calcEl.style.top = startTop + "px";
+    calcEl.classList.add("is-dragging");
+    e.preventDefault();
+  }
+
+  function onPointerMove(e) {
+    if (!isDragging) return;
+    var dx = e.clientX - startX;
+    var dy = e.clientY - startY;
+
+    var newLeft = startLeft + dx;
+    var newTop = startTop + dy;
+
+    var maxLeft = window.innerWidth - calcEl.offsetWidth - 10;
+    var maxTop = window.innerHeight - calcEl.offsetHeight - 10;
+    newLeft = Math.max(10, Math.min(newLeft, maxLeft));
+    newTop = Math.max(10, Math.min(newTop, maxTop));
+
+    calcEl.style.left = newLeft + "px";
+    calcEl.style.top = newTop + "px";
+  }
+
+  function onPointerUp(e) {
+    if (!isDragging) return;
+    isDragging = false;
+    calcEl.classList.remove("is-dragging");
+    try { handleEl.releasePointerCapture(e.pointerId); } catch (_) {}
+
+    var rect = calcEl.getBoundingClientRect();
+    localStorage.setItem("pb_calc_pos", JSON.stringify({ left: rect.left, top: rect.top }));
+  }
+
+  if (handleEl) {
+    handleEl.addEventListener("pointerdown", onPointerDown);
+    handleEl.addEventListener("pointermove", onPointerMove);
+    handleEl.addEventListener("pointerup", onPointerUp);
+    handleEl.addEventListener("pointercancel", onPointerUp);
+  }
+
+  function ensureVisiblePosition() {
+    try {
+      var saved = JSON.parse(localStorage.getItem("pb_calc_pos") || "null");
+      if (saved && typeof saved.left === "number" && typeof saved.top === "number") {
+        var maxLeft = window.innerWidth - 300;
+        var maxTop = window.innerHeight - 380;
+        var left = Math.max(10, Math.min(saved.left, maxLeft));
+        var top = Math.max(10, Math.min(saved.top, maxTop));
+        calcEl.style.right = "auto";
+        calcEl.style.bottom = "auto";
+        calcEl.style.left = left + "px";
+        calcEl.style.top = top + "px";
+      }
+    } catch (_) {}
+  }
+
+  function isCalcOpen() {
+    if (!calcEl) return false;
+    return calcEl.style.display !== "none" && !calcEl.classList.contains("calc-hidden");
+  }
+
+  function animateKeyBtn(action, val) {
+    try {
+      var btn = null;
+      if (action === "clear") btn = calcEl.querySelector('[data-calc-action="clear"]');
+      else if (action === "equal") btn = calcEl.querySelector('[data-calc-action="equal"]');
+      else if (action === "backspace") btn = calcEl.querySelector('[data-calc-action="backspace"]');
+      else if (action === "percent") btn = calcEl.querySelector('[data-calc-action="percent"]');
+      else if (action === "op" && val) btn = calcEl.querySelector('[data-calc-val="' + val + '"]');
+      else if (val !== undefined && val !== null) btn = calcEl.querySelector('.calc-key.num[data-calc-val="' + val + '"]');
+
+      if (btn) {
+        btn.classList.add("key-pressed");
+        setTimeout(function() { btn.classList.remove("key-pressed"); }, 140);
+      }
+    } catch (_) {}
+  }
+
+  // Keyboard shortcut listener
+  document.addEventListener("keydown", function(e) {
+    if (!isCalcOpen()) return;
+    var activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : "";
+    if (activeTag === "input" || activeTag === "textarea" || activeTag === "select") return;
+
+    var k = e.key;
+    var code = e.code;
+
+    // Clear (C / c / แ / ฉ / Delete / KeyC)
+    if (code === "KeyC" || k === "c" || k === "C" || k === "แ" || k === "ฉ" || k === "Delete" || code === "Delete") {
+      clearAll();
+      animateKeyBtn("clear");
+      e.preventDefault();
+      return;
+    }
+
+    if ((k >= "0" && k <= "9") || (code && code.startsWith("Numpad") && !isNaN(Number(code.replace("Numpad", ""))))) {
+      var numChar = (k >= "0" && k <= "9") ? k : code.replace("Numpad", "");
+      inputDigit(numChar);
+      animateKeyBtn(null, numChar);
+      e.preventDefault();
+      return;
+    }
+
+    if (k === "." || k === "ใ" || code === "NumpadDecimal") {
+      inputDot();
+      animateKeyBtn(null, ".");
+      e.preventDefault();
+      return;
+    }
+
+    if (k === "+" || code === "NumpadAdd") {
+      handleOp("+");
+      animateKeyBtn("op", "+");
+      e.preventDefault();
+      return;
+    }
+
+    if (k === "-" || code === "NumpadSubtract") {
+      handleOp("-");
+      animateKeyBtn("op", "-");
+      e.preventDefault();
+      return;
+    }
+
+    if (k === "*" || code === "NumpadMultiply") {
+      handleOp("*");
+      animateKeyBtn("op", "*");
+      e.preventDefault();
+      return;
+    }
+
+    if (k === "/" || code === "NumpadDivide") {
+      handleOp("/");
+      animateKeyBtn("op", "/");
+      e.preventDefault();
+      return;
+    }
+
+    if (k === "Enter" || k === "=" || code === "NumpadEnter") {
+      handleEqual();
+      animateKeyBtn("equal");
+      e.preventDefault();
+      return;
+    }
+
+    if (k === "Backspace" || code === "Backspace") {
+      backspace();
+      animateKeyBtn("backspace");
+      e.preventDefault();
+      return;
+    }
+
+    if (k === "Escape") {
+      hideCalculator();
+      e.preventDefault();
+      return;
+    }
+
+    if (k === "%") {
+      handlePercent();
+      animateKeyBtn("percent");
+      e.preventDefault();
+      return;
+    }
+  });
+
+  updateDisplay();
+})();

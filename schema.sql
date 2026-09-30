@@ -16,9 +16,13 @@ CREATE TABLE IF NOT EXISTS public.transactions (
   category    TEXT        NOT NULL,
   date        DATE        NOT NULL,
   note        TEXT        DEFAULT '',
+  is_paid     BOOLEAN     DEFAULT false,
   created_at  TIMESTAMPTZ DEFAULT NOW(),
   updated_at  TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Migration helper for existing databases:
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS is_paid BOOLEAN DEFAULT false;
 
 -- ─── INSTALLMENTS ────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.installments (
