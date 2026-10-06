@@ -68,7 +68,9 @@ let activePage           = "dashboard";
 let txFilter             = "all";
 let editingTxId          = null;
 let editingInstallmentId = null;
+let editingDebtId        = null;
 let editingNoteId        = null;
+let debtFilter           = "all";
 
 let _useCloud    = false;
 let _currentUser = null;
@@ -93,6 +95,17 @@ async function cloudSyncInst(op, id, inst) {
     if (op === "update") { await window.SupabaseDB.updateInstallment(id, inst); }
     if (op === "delete") { await window.SupabaseDB.deleteInstallment(id); }
   } catch (err) { console.warn("Cloud sync INST:", err.message); }
+  finally { setTimeout(function() { _isSyncing = false; }, 1500); }
+}
+
+async function cloudSyncDebt(op, id, debt) {
+  if (!_useCloud || !_currentUser || !window.SupabaseDB) return;
+  _isSyncing = true;
+  try {
+    if (op === "add")    { var saved = await window.SupabaseDB.addDebt(debt); if (saved && saved.id) debt.id = saved.id; }
+    if (op === "update") { await window.SupabaseDB.updateDebt(id, debt); }
+    if (op === "delete") { await window.SupabaseDB.deleteDebt(id); }
+  } catch (err) { console.warn("Cloud sync DEBT:", err.message); }
   finally { setTimeout(function() { _isSyncing = false; }, 1500); }
 }
 
@@ -152,7 +165,7 @@ function _id(id) { return document.getElementById(id); }
 
 /* ─── Empty data (new users start clean) ─────────────────── */
 function defaultData() {
-  return { transactions: [], installments: [], notes: [] };
+  return { transactions: [], installments: [], notes: [], debts: [] };
 }
 
 /* ─── Storage ────────────────────────────────────────────────── */
@@ -164,6 +177,7 @@ function loadData() {
       parsed.transactions = parsed.transactions || [];
       parsed.installments = parsed.installments || [];
       parsed.notes        = parsed.notes        || [];
+      parsed.debts        = parsed.debts        || [];
       return parsed;
     }
   } catch (e) { console.warn("Could not load data:", e); }
@@ -594,6 +608,136 @@ function renderInstallments() {
   }).join("");
 }
 
+/* ─── Render: Cash Debts ─────────────────────────────────────── */
+function debtTotals() {
+  var total = 0, paid = 0;
+  var count = (data.debts || []).length;
+  var activeCount = 0;
+  var settledCount = 0;
+  (data.debts || []).forEach(function(d) {
+    var amt = Number(d.amount || 0);
+    var pAmt = Math.min(Number(d.paidAmount || 0), amt);
+    total += amt;
+    paid += pAmt;
+    if (d.isSettled || pAmt >= amt) settledCount++;
+    else activeCount++;
+  });
+  return {
+    total: total,
+    paid: paid,
+    remaining: Math.max(total - paid, 0),
+    count: count,
+    activeCount: activeCount,
+    settledCount: settledCount
+  };
+}
+
+function renderDebts() {
+  var totals = debtTotals();
+  if (_id("debt-sum-total"))     _id("debt-sum-total").textContent     = money(totals.total);
+  if (_id("debt-sum-paid"))      _id("debt-sum-paid").textContent      = money(totals.paid);
+  if (_id("debt-sum-remaining")) _id("debt-sum-remaining").textContent = money(totals.remaining);
+  if (_id("debt-sum-count"))     _id("debt-sum-count").textContent     = totals.count + " รายการ";
+
+  var debts = (data.debts || []).filter(function(d) {
+    var isDone = Boolean(d.isSettled) || Number(d.paidAmount || 0) >= Number(d.amount || 0);
+    if (debtFilter === "active") return !isDone;
+    if (debtFilter === "settled") return isDone;
+    return true;
+  });
+
+  if (!debts.length) {
+    _id("debts-list").innerHTML = emptyMarkup((data.debts && data.debts.length)
+      ? "ไม่มีรายการหนี้ตามตัวกรองที่เลือก"
+      : "ยังไม่มีรายการหนี้เงินสด กดปุ่ม + เพิ่มรายการหนี้ เพื่อเริ่มต้นบันทึก");
+    return;
+  }
+
+  var sorted = debts.slice().sort(function(a, b) {
+    var aDone = Boolean(a.isSettled) || Number(a.paidAmount || 0) >= Number(a.amount || 0) ? 1 : 0;
+    var bDone = Boolean(b.isSettled) || Number(b.paidAmount || 0) >= Number(b.amount || 0) ? 1 : 0;
+    if (aDone !== bDone) return aDone - bDone;
+    return (b.dueDate || b.createdAt || "").localeCompare(a.dueDate || a.createdAt || "");
+  });
+
+  _id("debts-list").innerHTML = sorted.map(function(item) {
+    var amt    = Number(item.amount || 0);
+    var paid   = Math.min(Number(item.paidAmount || 0), amt);
+    var remain = Math.max(amt - paid, 0);
+    var isDone = Boolean(item.isSettled) || paid >= amt;
+    var pct    = amt > 0 ? Math.min((paid / amt) * 100, 100).toFixed(1) : 0;
+
+    var statusClass = isDone ? "pill pill-done" : "pill";
+    var statusText  = isDone ? "✓ ปิดหนี้แล้ว" : "⏳ รอชำระ";
+
+    var dueDisplay = "";
+    if (item.dueDate) {
+      var dueDt = new Date(item.dueDate + "T00:00:00");
+      var today = new Date();
+      today.setHours(0,0,0,0);
+      var diffDays = Math.ceil((dueDt - today) / (1000 * 60 * 60 * 24));
+      var dueClass = "";
+      var dueText = "กำหนดคืน: " + dateLabel(item.dueDate);
+      if (!isDone) {
+        if (diffDays < 0) {
+          dueClass = "overdue";
+          dueText += " (เลยกำหนด " + Math.abs(diffDays) + " วัน)";
+        } else if (diffDays === 0) {
+          dueClass = "due-today";
+          dueText += " (ครบกำหนดวันนี้!)";
+        } else if (diffDays <= 7) {
+          dueClass = "due-soon";
+          dueText += " (อีก " + diffDays + " วัน)";
+        }
+      }
+      dueDisplay = '<div class="debt-due ' + dueClass + '"><span>📅</span> ' + dueText + '</div>';
+    }
+
+    var lenderDisplay = item.lender ? '<span class="debt-lender-tag">👤 เจ้าหนี้: ' + escapeHtml(item.lender) + '</span>' : '';
+    var interestDisplay = item.interest ? '<div class="debt-interest-row"><span>🏷</span> ดอกเบี้ย/เงื่อนไข: ' + escapeHtml(item.interest) + '</div>' : '';
+    var noteDisplay = item.note ? '<div class="debt-note-row">' + escapeHtml(item.note) + '</div>' : '';
+
+    return '<article class="debt-card' + (isDone ? ' debt-card-done' : '') + '">'
+      + '<div class="debt-card-top">'
+        + '<div class="debt-card-title">'
+          + '<span class="transaction-icon debt-icon">💸</span>'
+          + '<div>'
+            + '<h3>' + escapeHtml(item.title) + '</h3>'
+            + lenderDisplay
+          + '</div>'
+        + '</div>'
+        + '<span class="' + statusClass + '">' + statusText + '</span>'
+      + '</div>'
+      + '<div class="debt-amounts-row">'
+        + '<div><small>ยอดหนี้ทั้งหมด</small><strong>' + money(amt) + '</strong></div>'
+        + '<div><small>คงเหลือสุทธิ</small><strong class="debt-remain-amt' + (isDone ? ' done' : '') + '">' + money(remain) + '</strong></div>'
+      + '</div>'
+      + '<div class="progress"><i style="width:' + pct + '%"></i></div>'
+      + '<div class="debt-progress-meta">'
+        + '<span>ชำระแล้ว ' + money(paid) + ' (' + pct + '%)</span>'
+        + '<span>คงเหลือ ' + money(remain) + '</span>'
+      + '</div>'
+      + dueDisplay
+      + interestDisplay
+      + noteDisplay
+      + '<div class="debt-card-foot">'
+        + '<div class="debt-actions-left">'
+          + '<button class="debt-action-btn' + (isDone ? ' btn-reopen' : ' btn-pay') + '" data-pay-debt="' + item.id + '">'
+            + (isDone ? 'แก้ไขยอดชำระ' : 'อัปเดตยอดชำระ')
+          + '</button>'
+          + '<button class="debt-action-btn btn-settle" data-toggle-settled-debt="' + item.id + '">'
+            + (isDone ? 'เปิดสถานะใหม่' : 'ปิดหนี้ (ชำระหมด)')
+          + '</button>'
+        + '</div>'
+        + '<div class="debt-actions-right">'
+          + '<button class="tx-edit-btn" data-edit-debt="' + item.id + '" title="แก้ไข">✎</button>'
+          + '<button class="delete-link" data-delete-debt="' + item.id + '">ลบ</button>'
+        + '</div>'
+      + '</div>'
+    + '</article>';
+  }).join("");
+}
+
 /* ─── Render: Notes ──────────────────────────────────────────── */
 function renderNotes() {
   var notes = data.notes.slice().sort(function(a,b) {
@@ -622,6 +766,7 @@ function render() {
   renderDashboard();
   renderAllTransactions();
   renderInstallments();
+  renderDebts();
   renderNotes();
 }
 
@@ -638,6 +783,7 @@ function switchPage(page) {
     dashboard:    ["ภาพรวม",         "สรุปการเงินของคุณ"],
     transactions: ["รายการทั้งหมด",  "รายการของ" + monthLabel()],
     installments: ["รายการผ่อนชำระ", "ติดตามค่าใช้จ่ายประจำเดือน"],
+    debts:        ["รายการหนี้เงินสด", "ติดตามและสรุปยอดหนี้สินเงินสด (ไม่รวมยอดผ่อนสินค้า)"],
     notes:        ["บันทึกความจำ",   "เก็บทุกเรื่องสำคัญไว้กับคุณ"]
   };
   var cfg = titles[page] || ["",""];
@@ -1155,6 +1301,218 @@ _id("notes-list").addEventListener("click", function(e) {
   toast("ลบบันทึกความจำแล้ว");
 });
 
+/* ─── Cash Debt modal ────────────────────────────────────────── */
+function openAddDebt() {
+  editingDebtId = null;
+  var form = _id("debt-form");
+  form.reset();
+  _id("debt-edit-id").value = "";
+  _id("debt-paid-amount").value = "0";
+  _id("debt-due-date").value = "";
+  _id("debt-modal-title").textContent = "เพิ่มรายการหนี้เงินสด";
+  _id("debt-submit-btn").textContent  = "บันทึกรายการ";
+  openModal("debt-modal");
+}
+
+function openEditDebt(id) {
+  var item = (data.debts || []).find(function(d) { return String(d.id) === String(id); });
+  if (!item) return;
+  editingDebtId = item.id;
+  var form = _id("debt-form");
+  form.reset();
+  _id("debt-edit-id").value     = item.id;
+  _id("debt-title").value       = item.title || "";
+  _id("debt-lender").value      = item.lender || "";
+  _id("debt-amount").value      = item.amount || "";
+  _id("debt-paid-amount").value = item.paidAmount || 0;
+  _id("debt-due-date").value    = item.dueDate || "";
+  _id("debt-interest").value    = item.interest || "";
+  _id("debt-note").value        = item.note || "";
+  _id("debt-modal-title").textContent = "แก้ไขรายการหนี้เงินสด";
+  _id("debt-submit-btn").textContent  = "บันทึกการแก้ไข";
+  openModal("debt-modal");
+}
+
+function openDebtPayModal(id) {
+  var item = (data.debts || []).find(function(d) { return String(d.id) === String(id); });
+  if (!item) return;
+  var form = _id("debt-pay-form");
+  form.reset();
+  _id("debt-pay-id").value = item.id;
+  var amt = Number(item.amount || 0);
+  var paid = Math.min(Number(item.paidAmount || 0), amt);
+  var remain = Math.max(amt - paid, 0);
+
+  _id("debt-pay-preview").innerHTML =
+    '<span class="transaction-icon debt-icon">💸</span>'
+    + '<div><strong>' + escapeHtml(item.title) + '</strong>'
+    + '<small>ยอดหนี้ทั้งหมด ' + money(amt) + ' · ชำระแล้ว ' + money(paid) + ' · เหลือ ' + money(remain) + '</small></div>';
+  
+  _id("debt-pay-add-amount").value = "";
+  _id("debt-pay-total-amount").value = "";
+  _id("debt-pay-total-amount").placeholder = paid.toFixed(2);
+  openModal("debt-pay-modal");
+}
+
+if (_id("open-debt")) {
+  _id("open-debt").addEventListener("click", openAddDebt);
+}
+
+/* Filter buttons for debts */
+document.querySelectorAll("#debt-filters .filter[data-debt-filter]").forEach(function(btn) {
+  btn.addEventListener("click", function() {
+    debtFilter = btn.dataset.debtFilter;
+    document.querySelectorAll("#debt-filters .filter[data-debt-filter]").forEach(function(x) {
+      x.classList.toggle("active", x === btn);
+    });
+    renderDebts();
+  });
+});
+
+/* Debt form submit */
+_id("debt-form").addEventListener("submit", function(e) {
+  e.preventDefault();
+  var form       = new FormData(e.currentTarget);
+  var title      = (form.get("title") || "").trim();
+  var lender     = (form.get("lender") || "").trim();
+  var amount     = parseFloat(form.get("amount"));
+  var paidAmount = parseFloat(form.get("paidAmount")) || 0;
+  var dueDate    = form.get("dueDate") || "";
+  var interest   = (form.get("interest") || "").trim();
+  var note       = (form.get("note") || "").trim();
+
+  if (!title || !amount || amount <= 0) {
+    toast("⚠️ กรุณากรอกชื่อรายการและยอดหนี้ให้ถูกต้อง");
+    return;
+  }
+
+  paidAmount = Math.max(0, paidAmount);
+  var isSettled = paidAmount >= amount;
+
+  if (editingDebtId) {
+    var editId = editingDebtId;
+    var idx = (data.debts || []).findIndex(function(d) { return String(d.id) === String(editId); });
+    if (idx !== -1) {
+      var prev = data.debts[idx];
+      data.debts[idx] = Object.assign({}, prev, {
+        title: title,
+        lender: lender,
+        amount: amount,
+        paidAmount: paidAmount,
+        dueDate: dueDate,
+        interest: interest,
+        note: note,
+        isSettled: isSettled || (paidAmount >= amount)
+      });
+      cloudSyncDebt("update", editId, data.debts[idx]);
+    }
+    editingDebtId = null;
+    saveData(); render();
+    closeModal("debt-modal");
+    toast("แก้ไขรายการหนี้เงินสดเรียบร้อยแล้ว");
+  } else {
+    data.debts = data.debts || [];
+    var newDebt = {
+      id: uid(),
+      title: title,
+      lender: lender,
+      amount: amount,
+      paidAmount: paidAmount,
+      dueDate: dueDate,
+      interest: interest,
+      note: note,
+      isSettled: isSettled,
+      createdAt: new Date().toISOString()
+    };
+    data.debts.push(newDebt);
+    cloudSyncDebt("add", null, newDebt);
+    saveData(); render();
+    e.currentTarget.reset();
+    closeModal("debt-modal");
+    toast("บันทึกรายการหนี้เงินสดเรียบร้อยแล้ว");
+  }
+});
+
+/* Debt pay form submit */
+_id("debt-pay-form").addEventListener("submit", function(e) {
+  e.preventDefault();
+  var form = new FormData(e.currentTarget);
+  var id   = form.get("id");
+  var item = (data.debts || []).find(function(d) { return String(d.id) === String(id); });
+  if (!item) return;
+
+  var addAmtRaw   = form.get("addPayAmount");
+  var totalAmtRaw = form.get("totalPaidAmount");
+  var addAmt      = parseFloat(addAmtRaw);
+  var totalAmt    = parseFloat(totalAmtRaw);
+  var currentPaid = Number(item.paidAmount || 0);
+  var newPaid     = currentPaid;
+
+  if (totalAmtRaw && totalAmtRaw.trim() !== "" && !isNaN(totalAmt) && totalAmt >= 0) {
+    newPaid = totalAmt;
+  } else if (addAmtRaw && addAmtRaw.trim() !== "" && !isNaN(addAmt) && addAmt > 0) {
+    newPaid = currentPaid + addAmt;
+  } else {
+    toast("⚠️ กรุณากรอกยอดชำระเพิ่ม หรือ ยอดชำระสะสมรวมใหม่");
+    return;
+  }
+
+  item.paidAmount = Math.max(0, newPaid);
+  if (item.paidAmount >= Number(item.amount || 0)) {
+    item.isSettled = true;
+  }
+
+  cloudSyncDebt("update", item.id, item);
+  saveData(); render();
+  closeModal("debt-pay-modal");
+  toast("อัปเดตยอดชำระหนี้แล้ว (ชำระแล้ว " + money(item.paidAmount) + ")");
+});
+
+/* Debt list clicks (pay, toggle settle, edit, delete) */
+_id("debts-list").addEventListener("click", function(e) {
+  var payBtn    = e.target.closest("[data-pay-debt]");
+  var settleBtn = e.target.closest("[data-toggle-settled-debt]");
+  var editBtn   = e.target.closest("[data-edit-debt]");
+  var delBtn    = e.target.closest("[data-delete-debt]");
+
+  if (payBtn) {
+    openDebtPayModal(payBtn.dataset.payDebt);
+    return;
+  }
+  if (settleBtn) {
+    var sId = settleBtn.dataset.toggleSettledDebt;
+    var sItem = (data.debts || []).find(function(d) { return String(d.id) === String(sId); });
+    if (sItem) {
+      if (sItem.isSettled) {
+        sItem.isSettled = false;
+        toast("เปิดสถานะหนี้ใหม่: " + sItem.title);
+      } else {
+        sItem.isSettled = true;
+        if (Number(sItem.paidAmount || 0) < Number(sItem.amount || 0)) {
+          sItem.paidAmount = sItem.amount; // mark as fully paid
+        }
+        toast("🎉 ยินดีด้วย! บันทึกปิดหนี้แล้ว: " + sItem.title);
+      }
+      cloudSyncDebt("update", sItem.id, sItem);
+      saveData(); render();
+    }
+    return;
+  }
+  if (editBtn) {
+    openEditDebt(editBtn.dataset.editDebt);
+    return;
+  }
+  if (delBtn) {
+    var dId = delBtn.dataset.deleteDebt;
+    if (!confirm("ลบรายการหนี้สินนี้ใช่ไหม?")) return;
+    data.debts = (data.debts || []).filter(function(d) { return String(d.id) !== String(dId); });
+    cloudSyncDebt("delete", dId, null);
+    saveData(); render();
+    toast("ลบรายการหนี้แล้ว");
+    return;
+  }
+});
+
 /* ─── Initial setup ──────────────────────────────────────────── */
 populateCategories(txCategoryEl, "expense");
 populateCategories(_id("installment-category"), "expense");
@@ -1394,10 +1752,11 @@ document.addEventListener("supabase:ready", async function() {
         await window.SupabaseMigration.migrateFromLocalStorage(STORAGE_KEY);
 
         var cloudData = await window.SupabaseDB.loadAll();
-        if (cloudData.transactions.length || cloudData.installments.length || cloudData.notes.length) {
+        if (cloudData.transactions.length || cloudData.installments.length || cloudData.notes.length || (cloudData.debts && cloudData.debts.length)) {
           data.transactions = cloudData.transactions;
           data.installments = cloudData.installments;
           data.notes        = cloudData.notes;
+          data.debts        = cloudData.debts || [];
           saveData(); // keep localStorage in sync
         }
         render();
@@ -1412,6 +1771,7 @@ document.addEventListener("supabase:ready", async function() {
             data.transactions = d.transactions;
             data.installments = d.installments;
             data.notes        = d.notes;
+            data.debts        = d.debts || [];
             saveData();
             render();
           }).catch(function() {});

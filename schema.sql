@@ -49,6 +49,22 @@ CREATE TABLE IF NOT EXISTS public.notes (
   updated_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- ─── CASH DEBTS ──────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.debts (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  title       TEXT        NOT NULL,
+  lender      TEXT        DEFAULT '',
+  amount      NUMERIC(12,2) NOT NULL CHECK (amount > 0),
+  paid_amount NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (paid_amount >= 0),
+  due_date    DATE,
+  interest    TEXT        DEFAULT '',
+  note        TEXT        DEFAULT '',
+  is_settled  BOOLEAN     NOT NULL DEFAULT false,
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- ─── UPDATED_AT TRIGGER ──────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.set_updated_at()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
@@ -65,12 +81,16 @@ DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='trg_notes_updated_at') THEN
     CREATE TRIGGER trg_notes_updated_at BEFORE UPDATE ON public.notes FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='trg_debts_updated_at') THEN
+    CREATE TRIGGER trg_debts_updated_at BEFORE UPDATE ON public.debts FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+  END IF;
 END $$;
 
 -- ─── ROW LEVEL SECURITY ──────────────────────────────────────
 ALTER TABLE public.transactions  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.installments  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notes         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.debts         ENABLE ROW LEVEL SECURITY;
 
 -- Transactions policies
 DROP POLICY IF EXISTS "Users read own transactions"   ON public.transactions;
@@ -102,11 +122,22 @@ CREATE POLICY "Users insert own notes" ON public.notes FOR INSERT WITH CHECK (au
 CREATE POLICY "Users update own notes" ON public.notes FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "Users delete own notes" ON public.notes FOR DELETE USING (auth.uid() = user_id);
 
+-- Debts policies
+DROP POLICY IF EXISTS "Users read own debts"   ON public.debts;
+DROP POLICY IF EXISTS "Users insert own debts" ON public.debts;
+DROP POLICY IF EXISTS "Users update own debts" ON public.debts;
+DROP POLICY IF EXISTS "Users delete own debts" ON public.debts;
+CREATE POLICY "Users read own debts"   ON public.debts FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users insert own debts" ON public.debts FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users update own debts" ON public.debts FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users delete own debts" ON public.debts FOR DELETE USING (auth.uid() = user_id);
+
 -- ─── INDEXES ─────────────────────────────────────────────────
 -- (user_id, date DESC) รองรับทุก query ตามเดือนด้วย range scan
 CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON public.transactions(user_id, date DESC);
 CREATE INDEX IF NOT EXISTS idx_installments_user      ON public.installments(user_id);
 CREATE INDEX IF NOT EXISTS idx_notes_user             ON public.notes(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_debts_user             ON public.debts(user_id, created_at DESC);
 
 -- ─── REALTIME ───────────────────────────────────────────
 -- Enable Realtime for these tables (safe to re-run; ignore
@@ -120,5 +151,8 @@ DO $$ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname='supabase_realtime' AND tablename='notes') THEN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.notes;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname='supabase_realtime' AND tablename='debts') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.debts;
   END IF;
 END $$;

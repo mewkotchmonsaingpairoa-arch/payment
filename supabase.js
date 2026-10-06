@@ -171,14 +171,44 @@ const SupabaseDB = {
     if (error) throw error;
   },
 
+  /* ── Cash Debts ────────────────────────────────────────────── */
+  async getDebts() {
+    const [c, user] = await _cu();
+    if (!user) return [];
+    const { data, error } = await c.from("debts")
+      .select("*").eq("user_id", user.id).order("created_at", { ascending: false });
+    if (error) { console.error("getDebts:", error.message); return []; }
+    return (data || []).map(_debtFromDB);
+  },
+  async addDebt(debt) {
+    const [c, user] = await _cu(); _requireUser(user);
+    const { data, error } = await c.from("debts")
+      .insert([_debtToDB(debt, user.id)]).select().single();
+    if (error) throw error;
+    return _debtFromDB(data);
+  },
+  async updateDebt(id, debt) {
+    const [c, user] = await _cu(); _requireUser(user);
+    const { data, error } = await c.from("debts")
+      .update(_debtToDB(debt, user.id)).eq("id", id).eq("user_id", user.id).select().single();
+    if (error) throw error;
+    return _debtFromDB(data);
+  },
+  async deleteDebt(id) {
+    const [c, user] = await _cu(); _requireUser(user);
+    const { error } = await c.from("debts").delete().eq("id", id).eq("user_id", user.id);
+    if (error) throw error;
+  },
+
   /* ── Load all at once ──────────────────────────────────────── */
   async loadAll() {
-    const [transactions, installments, notes] = await Promise.all([
+    const [transactions, installments, notes, debts] = await Promise.all([
       SupabaseDB.getTransactions(),
       SupabaseDB.getInstallments(),
-      SupabaseDB.getNotes()
+      SupabaseDB.getNotes(),
+      SupabaseDB.getDebts()
     ]);
-    return { transactions, installments, notes };
+    return { transactions, installments, notes, debts };
   }
 };
 
@@ -191,7 +221,7 @@ const SupabaseRealtime = {
     try {
       await this.unsubscribeAll();
       const c = await getClient();
-      const tables = ["transactions", "installments", "notes"];
+      const tables = ["transactions", "installments", "notes", "debts"];
       for (const table of tables) {
         const channelName = `pb:${table}:${userId}`;
         try {
@@ -256,12 +286,13 @@ const SupabaseMigration = {
       .select("id", { count: "exact", head: true }).eq("user_id", user.id);
     if (count > 0) return { migrated: false, reason: "already has data" };
 
-    // FIX: build proper Promises by awaiting each query
+    // build proper Promises by awaiting each query
     const txInserts   = (local.transactions || []).map(tx   => c.from("transactions").insert(_txToDB(tx, user.id)));
     const instInserts = (local.installments || []).map(inst => c.from("installments").insert(_instToDB(inst, user.id)));
     const noteInserts = (local.notes        || []).map(note => c.from("notes").insert(_noteToDB(note, user.id)));
+    const debtInserts = (local.debts        || []).map(debt => c.from("debts").insert(_debtToDB(debt, user.id)));
 
-    const results = await Promise.allSettled([...txInserts, ...instInserts, ...noteInserts]);
+    const results = await Promise.allSettled([...txInserts, ...instInserts, ...noteInserts, ...debtInserts]);
     const failed  = results.filter(r => r.status === "rejected" || r.value?.error);
 
     if (!failed.length) {
@@ -291,6 +322,34 @@ function _instFromDB(r)    { return { id: r.id, title: r.title, amount: +r.amoun
 
 function _noteToDB(n, uid) { return { user_id: uid, title: n.title, content: n.content, date: n.date || null }; }
 function _noteFromDB(r)    { return { id: r.id, title: r.title, content: r.content, date: r.date || "", createdAt: r.created_at }; }
+
+function _debtToDB(d, uid) {
+  return {
+    user_id: uid,
+    title: d.title,
+    lender: d.lender || "",
+    amount: +d.amount,
+    paid_amount: +(d.paidAmount || 0),
+    due_date: d.dueDate || null,
+    interest: d.interest || "",
+    note: d.note || "",
+    is_settled: Boolean(d.isSettled)
+  };
+}
+function _debtFromDB(r) {
+  return {
+    id: r.id,
+    title: r.title,
+    lender: r.lender || "",
+    amount: +r.amount,
+    paidAmount: +(r.paid_amount || 0),
+    dueDate: r.due_date || "",
+    interest: r.interest || "",
+    note: r.note || "",
+    isSettled: Boolean(r.is_settled),
+    createdAt: r.created_at
+  };
+}
 
 /* ── Globals ────────────────────────────────────────────────── */
 window.SupabaseAuth      = SupabaseAuth;
