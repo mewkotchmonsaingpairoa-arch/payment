@@ -690,17 +690,17 @@ function renderDebts() {
           dueText += " (อีก " + diffDays + " วัน)";
         }
       }
-      dueDisplay = '<div class="debt-due ' + dueClass + '"><span>📅</span> ' + dueText + '</div>';
+      dueDisplay = '<div class="debt-due ' + dueClass + '"><span>◷</span> ' + dueText + '</div>';
     }
 
-    var lenderDisplay = item.lender ? '<span class="debt-lender-tag">👤 เจ้าหนี้: ' + escapeHtml(item.lender) + '</span>' : '';
-    var interestDisplay = item.interest ? '<div class="debt-interest-row"><span>🏷</span> ดอกเบี้ย/เงื่อนไข: ' + escapeHtml(item.interest) + '</div>' : '';
+    var lenderDisplay = item.lender ? '<span class="debt-lender-tag">◎ เจ้าหนี้: ' + escapeHtml(item.lender) + '</span>' : '';
+    var interestDisplay = item.interest ? '<div class="debt-interest-row"><span>◇</span> ดอกเบี้ย/เงื่อนไข: ' + escapeHtml(item.interest) + '</div>' : '';
     var noteDisplay = item.note ? '<div class="debt-note-row">' + escapeHtml(item.note) + '</div>' : '';
 
     return '<article class="debt-card' + (isDone ? ' debt-card-done' : '') + '">'
       + '<div class="debt-card-top">'
         + '<div class="debt-card-title">'
-          + '<span class="transaction-icon debt-icon">💸</span>'
+          + '<span class="transaction-icon debt-icon">◈</span>'
           + '<div>'
             + '<h3>' + escapeHtml(item.title) + '</h3>'
             + lenderDisplay
@@ -1344,7 +1344,7 @@ function openDebtPayModal(id) {
   var remain = Math.max(amt - paid, 0);
 
   _id("debt-pay-preview").innerHTML =
-    '<span class="transaction-icon debt-icon">💸</span>'
+    '<span class="transaction-icon debt-icon">◈</span>'
     + '<div><strong>' + escapeHtml(item.title) + '</strong>'
     + '<small>ยอดหนี้ทั้งหมด ' + money(amt) + ' · ชำระแล้ว ' + money(paid) + ' · เหลือ ' + money(remain) + '</small></div>';
   
@@ -1491,7 +1491,7 @@ _id("debts-list").addEventListener("click", function(e) {
         if (Number(sItem.paidAmount || 0) < Number(sItem.amount || 0)) {
           sItem.paidAmount = sItem.amount; // mark as fully paid
         }
-        toast("🎉 ยินดีด้วย! บันทึกปิดหนี้แล้ว: " + sItem.title);
+        toast("✓ บันทึกปิดหนี้แล้ว: " + sItem.title);
       }
       cloudSyncDebt("update", sItem.id, sItem);
       saveData(); render();
@@ -1760,7 +1760,7 @@ document.addEventListener("supabase:ready", async function() {
           saveData(); // keep localStorage in sync
         }
         render();
-        toast("🌸 ยินดีต้อนรับ " + (user.user_metadata?.display_name || user.email.split("@")[0]));
+        toast("ยินดีต้อนรับ " + (user.user_metadata?.display_name || user.email.split("@")[0]));
 
         /* Start Realtime */
         await window.SupabaseRealtime.subscribe(user.id, function(table, payload) {
@@ -2007,7 +2007,7 @@ _id("auth-offline-link").addEventListener("click", function(e) { useOfflineMode(
       var text = state.current;
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(function() {
-          toast("📋 คัดลอก " + text + " แล้ว");
+          toast("คัดลอก " + text + " แล้ว");
         }).catch(function() {
           toast("ยอดปัจจุบัน: " + text);
         });
@@ -2048,13 +2048,13 @@ _id("auth-offline-link").addEventListener("click", function(e) { useOfflineMode(
       }
 
       if (applied) {
-        toast("✨ นำยอด ฿" + rounded.toLocaleString("th-TH") + " ใส่ในฟอร์มแล้ว");
+        toast("นำยอด ฿" + rounded.toLocaleString("th-TH") + " ใส่ในฟอร์มแล้ว");
       } else {
         openAddTransaction();
         setTimeout(function() {
           var input = document.querySelector('#transaction-modal [name="amount"]');
           if (input) input.value = rounded;
-          toast("✨ ใส่ยอด ฿" + rounded.toLocaleString("th-TH") + " ในรายการใหม่แล้ว");
+          toast("ใส่ยอด ฿" + rounded.toLocaleString("th-TH") + " ในรายการใหม่แล้ว");
         }, 120);
       }
     });
@@ -2095,7 +2095,7 @@ _id("auth-offline-link").addEventListener("click", function(e) { useOfflineMode(
     calcEl.style.right = "24px";
     calcEl.style.bottom = "84px";
     localStorage.removeItem("pb_calc_pos");
-    toast("📍 รีเซ็ตตำแหน่งเครื่องคิดเลขแล้ว");
+    toast("รีเซ็ตตำแหน่งเครื่องคิดเลขแล้ว");
   }
 
   if (fabBtn) fabBtn.addEventListener("click", toggleCalculator);

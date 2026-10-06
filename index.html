@@ -27,12 +27,12 @@
           <button class="nav-item active" data-page="dashboard"><span>▦</span> ภาพรวม</button>
           <button class="nav-item" data-page="transactions"><span>↕</span> รายการทั้งหมด</button>
           <button class="nav-item" data-page="installments"><span>◫</span> รายการผ่อนชำระ</button>
-          <button class="nav-item" data-page="debts"><span>💸</span> หนี้เงินสด</button>
+          <button class="nav-item" data-page="debts"><span>◈</span> หนี้เงินสด</button>
           <button class="nav-item" data-page="notes"><span>✎</span> บันทึกความจำ</button>
         </nav>
 
         <div class="sidebar-bottom">
-          <button type="button" id="open-calc-sidebar" class="btn-calc-sidebar" title="เปิดเครื่องคิดเลข"><span>🧮</span> เครื่องคิดเลข</button>
+          <button type="button" id="open-calc-sidebar" class="btn-calc-sidebar" title="เปิดเครื่องคิดเลข"><span>⊞</span> เครื่องคิดเลข</button>
           <button type="button" data-open-categories class="btn-manage-cat-sidebar" title="จัดการหมวดหมู่"><span>⚙</span> จัดการหมวดหมู่</button>
           <div class="safe-card">
             <span class="safe-icon">⌁</span>
@@ -55,7 +55,7 @@
           <div class="header-actions">
             <div class="pet-widget" title="เพื่อนร่วมวางแผนการเงิน"><span>◕ᴗ◕</span><div><small>วันนี้เก่งมาก!</small><strong>+10 ดอกไม้</strong></div></div>
             <div class="month-picker" aria-label="เลือกเดือน"><button type="button" data-month-direction="-1" title="เดือนก่อนหน้า">‹</button><strong id="current-month">กันยายน 2569</strong><button type="button" data-month-direction="1" title="เดือนถัดไป">›</button></div>
-            <button type="button" class="button ghost calc-topbar-btn" id="open-calc-topbar" title="เครื่องคิดเลข"><span>🧮</span> คิดเลข</button>
+            <button type="button" class="button ghost calc-topbar-btn" id="open-calc-topbar" title="เครื่องคิดเลข"><span>⊞</span> คิดเลข</button>
             <button class="button primary" id="open-transaction"><span>＋</span> เพิ่มรายการ</button>
             <!-- Mobile-only profile/login button -->
             <button class="mobile-profile-btn" id="mobile-profile-btn" title="บัญชีผู้ใช้"><span id="mobile-avatar">?</span></button>
@@ -104,7 +104,7 @@
             <div class="quest-character">(◕ᴗ◕) <i>✿</i></div>
             <div><span class="quest-label">MINI QUEST</span><h2>อย่าลืมเก็บเงิน 10% จากรายได้นะ</h2><p>ลดค่าใช้จ่ายด้วย</p></div>
             <div class="quest-progress"><span id="quest-days">0 / 7 วัน</span><div><i id="quest-bar" style="width:0%"></i></div></div>
-            <button class="quest-reward" type="button" title="ของรางวัลรออยู่">🎁</button>
+            <button class="quest-reward" type="button" title="ของรางวัลรออยู่">✦</button>
           </section>
 
           <section class="panel month-transactions">
@@ -157,7 +157,7 @@
         <section class="page" id="debts-page">
           <section class="debt-summary-strip" aria-label="สรุปยอดหนี้เงินสด">
             <article class="debt-sum-card debt-sum-total">
-              <div class="debt-sum-icon">💸</div>
+              <div class="debt-sum-icon">◈</div>
               <div><span>ยอดหนี้รวม</span><strong id="debt-sum-total">฿0</strong></div>
             </article>
             <article class="debt-sum-card debt-sum-paid">
@@ -165,7 +165,7 @@
               <div><span>ชำระแล้ว</span><strong id="debt-sum-paid">฿0</strong></div>
             </article>
             <article class="debt-sum-card debt-sum-remaining">
-              <div class="debt-sum-icon">⏳</div>
+              <div class="debt-sum-icon">◷</div>
               <div><span>คงเหลือสุทธิ</span><strong id="debt-sum-remaining">฿0</strong></div>
             </article>
             <article class="debt-sum-card debt-sum-count">
@@ -307,7 +307,7 @@
             <input name="totalPaidAmount" id="debt-pay-total-amount" type="number" min="0" step="any" placeholder="0.00" inputmode="decimal" />
           </label>
         </div>
-        <p class="form-hint">💡 กรอก "ยอดชำระเพิ่มครั้งนี้" เพื่อบวกสะสม หรือกรอก "ยอดชำระสะสมรวมใหม่" หากต้องการแก้ไขยอดสะสมโดยตรง</p>
+        <p class="form-hint">✦ กรอก "ยอดชำระเพิ่มครั้งนี้" เพื่อบวกสะสม หรือกรอก "ยอดชำระสะสมรวมใหม่" หากต้องการแก้ไขยอดสะสมโดยตรง</p>
         <div class="modal-actions">
           <button type="button" class="button ghost" data-close="debt-pay-modal">ยกเลิก</button>
           <button class="button primary" type="submit">บันทึกยอดชำระ</button>
@@ -372,7 +372,7 @@
       <button class="nav-item active" data-page="dashboard"><span>▦</span><small>ภาพรวม</small></button>
       <button class="nav-item" data-page="transactions"><span>↕</span><small>รายการ</small></button>
       <button class="nav-item" data-page="installments"><span>◫</span><small>ผ่อนชำระ</small></button>
-      <button class="nav-item" data-page="debts"><span>💸</span><small>หนี้เงินสด</small></button>
+      <button class="nav-item" data-page="debts"><span>◈</span><small>หนี้เงินสด</small></button>
       <button class="nav-item" data-page="notes"><span>✎</span><small>บันทึก</small></button>
       <button class="nav-item" id="mobile-account-btn" title="บัญชีผู้ใช้"><span id="mobile-nav-avatar">◌</span><small id="mobile-nav-label">เข้าสู่ระบบ</small></button>
     </nav>
@@ -425,7 +425,7 @@
           <span class="calc-dot calc-dot-max" id="calc-reset-pos-dot" title="รีเซ็ตตำแหน่ง"></span>
         </div>
         <div class="calc-header-title" id="calc-header-title">
-          <span>🧮 เครื่องคิดเลข</span>
+          <span>⊞ เครื่องคิดเลข</span>
         </div>
         <div class="calc-header-btns">
           <button type="button" class="calc-min-btn" id="calc-min-btn" title="ย่อหน้าต่าง">−</button>
@@ -438,7 +438,7 @@
           <div class="calc-current" id="calc-current">0</div>
         </div>
         <div class="calc-tools-row">
-          <button type="button" class="calc-tool-btn" id="calc-copy-btn" title="คัดลอกผลลัพธ์">📋 คัดลอก</button>
+          <button type="button" class="calc-tool-btn" id="calc-copy-btn" title="คัดลอกผลลัพธ์">⎘ คัดลอก</button>
           <button type="button" class="calc-tool-btn" id="calc-apply-btn" title="นำยอดนี้ไปใส่ในฟอร์มที่เปิดอยู่">↵ ใส่ในฟอร์ม</button>
         </div>
         <div class="calc-keypad">
@@ -472,7 +472,7 @@
 
     <!-- Floating Calculator FAB (Bottom right corner) -->
     <button id="calc-fab-btn" class="calc-fab" title="เปิด/ปิดเครื่องคิดเลข" aria-label="เครื่องคิดเลข">
-      <span class="calc-fab-icon">🧮</span>
+      <span class="calc-fab-icon">⊞</span>
       <span class="calc-fab-label">คิดเลข</span>
     </button>
 
