@@ -1186,11 +1186,14 @@ function renderBatchItemsList(list) {
     var meta = CATEGORY_META[item.category] || CATEGORY_META.other;
     var isInc = item.type === "income";
     return '<label class="batch-item-row">'
-      + '<input type="checkbox" class="batch-item-chk" value="' + item.id + '" checked>'
-      + '<span class="transaction-icon ' + (isInc ? 'income' : '') + '" style="width:28px;height:28px;font-size:13px">' + meta.icon + '</span>'
+      + '<span class="batch-chk-wrap">'
+      +   '<input type="checkbox" class="batch-item-chk tx-paid-chk" value="' + item.id + '" checked>'
+      +   '<span class="tx-custom-checkbox"><svg class="tx-check-icon" viewBox="0 0 12 10"><polyline points="1.5 5 4.5 8 10.5 2"></polyline></svg></span>'
+      + '</span>'
+      + '<span class="transaction-icon ' + (isInc ? 'income' : '') + '">' + meta.icon + '</span>'
       + '<div class="batch-item-info">'
-      + '<strong>' + escapeHtml(item.title) + '</strong>'
-      + '<small>' + meta.label + ' · ' + dateLabel(item.date) + '</small>'
+      +   '<strong>' + escapeHtml(item.title) + '</strong>'
+      +   '<small>' + meta.label + ' · ' + dateLabel(item.date) + '</small>'
       + '</div>'
       + '<span class="batch-item-amount ' + (isInc ? 'income' : 'expense') + '">' + money(item.amount, isInc ? '+' : '−') + '</span>'
       + '</label>';
