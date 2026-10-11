@@ -6,7 +6,7 @@
     <title>PocketBloom — เกมจัดการเงิน</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="apple-touch-icon" href="favicon.svg" />
-    <link rel="stylesheet" href="styles.css?v=7" />
+    <link rel="stylesheet" href="styles.css?v=10" />
   </head>
   <body>
     <div class="desktop-frame">
@@ -133,7 +133,16 @@
             </article>
           </section>
           <section class="panel full-panel">
-            <div class="panel-heading"><div><h2>รายการทั้งหมด</h2><p>รายการที่เกิดขึ้นในเดือนที่เลือก รวมรายการผ่อนอัตโนมัติ</p></div><button class="button primary small" id="open-transaction-secondary">＋ เพิ่มรายการ</button></div>
+            <div class="panel-heading">
+              <div>
+                <h2>รายการทั้งหมด</h2>
+                <p>รายการที่เกิดขึ้นในเดือนที่เลือก รวมรายการผ่อนอัตโนมัติ</p>
+              </div>
+              <div class="panel-heading-actions">
+                <button class="button ghost small" id="open-batch-duplicate" title="คัดลอกรายการในเดือนนี้ไปยังเดือนอื่น"><span>⎘</span> คัดลอกไปเดือนอื่น</button>
+                <button class="button primary small" id="open-transaction-secondary">＋ เพิ่มรายการ</button>
+              </div>
+            </div>
             <div class="filter-row">
               <button class="filter active" data-filter="all">ทั้งหมด</button>
               <button class="filter" data-filter="income">รายรับ</button>
@@ -215,7 +224,11 @@
             <span class="custom-chk-text"><strong>ชำระเงินแล้ว (จ่ายแล้ว)</strong><small>หากยังไม่ได้จ่าย ให้เอาติ๊กออกเพื่อติดตามยอดค้างชำระ</small></span>
           </label>
         </div>
-        <div class="modal-actions"><button type="button" class="button ghost" data-close="transaction-modal">ยกเลิก</button><button class="button primary" id="tx-submit-btn" type="submit">บันทึกรายการ</button></div>
+        <div class="modal-actions">
+          <button type="button" class="button ghost" id="tx-dup-modal-btn" style="margin-right:auto;display:none" title="คัดลอกรายการนี้ไปยังเดือนอื่น">⎘ คัดลอกไปเดือนอื่น</button>
+          <button type="button" class="button ghost" data-close="transaction-modal">ยกเลิก</button>
+          <button class="button primary" id="tx-submit-btn" type="submit">บันทึกรายการ</button>
+        </div>
       </form>
     </div>
 
@@ -324,6 +337,131 @@
         <label>รายละเอียด<textarea required name="content" placeholder="เขียนสิ่งที่อยากจดจำ..." maxlength="500"></textarea></label>
         <label>วันที่เกี่ยวข้อง <input name="date" id="note-date" type="date" /></label>
         <div class="modal-actions"><button type="button" class="button ghost" data-close="note-modal">ยกเลิก</button><button class="button primary" id="note-submit-btn" type="submit">บันทึกความจำ</button></div>
+      </form>
+    </div>
+
+    <!-- ═══ DUPLICATE TRANSACTION MODAL ═════════════════════════ -->
+    <div class="modal-backdrop" id="duplicate-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="dup-modal-title">
+      <form class="modal" id="duplicate-form" style="max-width:480px">
+        <input type="hidden" name="sourceId" id="dup-source-id" />
+        <div class="modal-title">
+          <div><p class="eyebrow">คัดลอกรายการ</p><h2 id="dup-modal-title">คัดลอกไปยังเดือนอื่น</h2></div>
+          <button type="button" class="close" data-close="duplicate-modal">×</button>
+        </div>
+
+        <div class="dup-preview-card" id="dup-preview-card">
+          <div class="dup-preview-icon" id="dup-preview-icon">○</div>
+          <div class="dup-preview-info">
+            <strong id="dup-preview-title">ชื่อรายการ</strong>
+            <small id="dup-preview-meta">หมวดหมู่ · วันที่</small>
+          </div>
+          <div class="dup-preview-amount" id="dup-preview-amount">฿0</div>
+        </div>
+
+        <div class="form-grid" style="margin-top:12px">
+          <label>เลือกเดือนเป้าหมาย
+            <input required name="targetMonth" id="dup-target-month" type="month" />
+          </label>
+          <label>วันที่ในเดือนใหม่
+            <input required name="targetDate" id="dup-target-date" type="date" />
+          </label>
+        </div>
+
+        <div class="dup-quick-months">
+          <span class="dup-quick-label">เลือกเร็ว:</span>
+          <button type="button" class="dup-chip" data-dup-add-months="1">+1 เดือน (เดือนถัดไป)</button>
+          <button type="button" class="dup-chip" data-dup-add-months="2">+2 เดือน</button>
+          <button type="button" class="dup-chip" data-dup-add-months="3">+3 เดือน</button>
+        </div>
+
+        <div class="tx-paid-toggle-box" id="dup-paid-box" style="margin:6px 0 10px">
+          <label class="custom-checkbox-row">
+            <input type="checkbox" name="resetUnpaid" id="dup-reset-unpaid" checked />
+            <span class="custom-chk-mark"><svg viewBox="0 0 12 10"><polyline points="1.5 5 4.5 8 10.5 2"></polyline></svg></span>
+            <span class="custom-chk-text">
+              <strong>รีเซ็ตสถานะเป็น "ยังไม่จ่าย" (รอชำระ)</strong>
+              <small>เหมาะสำหรับค่าใช้จ่ายประจำที่ต้องชำระใหม่ในเดือนหน้า</small>
+            </span>
+          </label>
+        </div>
+
+        <div class="tx-paid-toggle-box" style="margin:0 0 16px">
+          <label class="custom-checkbox-row">
+            <input type="checkbox" name="goToTargetMonth" id="dup-go-to-month" checked />
+            <span class="custom-chk-mark"><svg viewBox="0 0 12 10"><polyline points="1.5 5 4.5 8 10.5 2"></polyline></svg></span>
+            <span class="custom-chk-text">
+              <strong>สลับไปดูเดือนเป้าหมายทันที</strong>
+              <small>เปิดไปยังเดือนที่คัดลอกไปเพื่อให้เห็นรายการทันที</small>
+            </span>
+          </label>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="button ghost" data-close="duplicate-modal">ยกเลิก</button>
+          <button class="button primary" id="dup-submit-btn" type="submit">⎘ คัดลอกรายการ</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- ═══ BATCH DUPLICATE MODAL ════════════════════════════════ -->
+    <div class="modal-backdrop" id="batch-duplicate-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="batch-dup-modal-title">
+      <form class="modal" id="batch-duplicate-form" style="max-width:520px">
+        <div class="modal-title">
+          <div><p class="eyebrow">คัดลอกทั้งเดือน</p><h2 id="batch-dup-modal-title">คัดลอกรายการไปยังเดือนอื่น</h2></div>
+          <button type="button" class="close" data-close="batch-duplicate-modal">×</button>
+        </div>
+
+        <div class="form-grid">
+          <label>จากเดือนปัจจุบัน
+            <input readonly id="batch-dup-source-month-display" style="background:#f9f5fa;cursor:default;" />
+          </label>
+          <label>ไปยังเดือนเป้าหมาย
+            <input required name="batchTargetMonth" id="batch-dup-target-month" type="month" />
+          </label>
+        </div>
+
+        <div class="dup-quick-months" style="margin-bottom:12px">
+          <span class="dup-quick-label">เลือกเร็ว:</span>
+          <button type="button" class="dup-chip" data-batch-add-months="1">+1 เดือน (เดือนถัดไป)</button>
+          <button type="button" class="dup-chip" data-batch-add-months="2">+2 เดือน</button>
+          <button type="button" class="dup-chip" data-batch-add-months="3">+3 เดือน</button>
+        </div>
+
+        <div class="batch-select-bar">
+          <span id="batch-selected-count">เลือก 0 รายการ</span>
+          <div style="display:flex;gap:6px">
+            <button type="button" class="button ghost small" id="batch-select-all-btn">เลือกทั้งหมด</button>
+            <button type="button" class="button ghost small" id="batch-unselect-all-btn">ไม่เลือกเลย</button>
+          </div>
+        </div>
+
+        <div class="batch-items-list" id="batch-items-list"></div>
+
+        <div class="tx-paid-toggle-box" style="margin:12px 0 8px">
+          <label class="custom-checkbox-row">
+            <input type="checkbox" name="batchResetUnpaid" id="batch-reset-unpaid" checked />
+            <span class="custom-chk-mark"><svg viewBox="0 0 12 10"><polyline points="1.5 5 4.5 8 10.5 2"></polyline></svg></span>
+            <span class="custom-chk-text">
+              <strong>รีเซ็ตสถานะเป็น "ยังไม่จ่าย" สำหรับรายจ่าย</strong>
+              <small>ให้เป็นรายการรอชำระในเดือนเป้าหมาย</small>
+            </span>
+          </label>
+        </div>
+
+        <div class="tx-paid-toggle-box" style="margin:0 0 16px">
+          <label class="custom-checkbox-row">
+            <input type="checkbox" name="batchGoToTarget" id="batch-goto-target" checked />
+            <span class="custom-chk-mark"><svg viewBox="0 0 12 10"><polyline points="1.5 5 4.5 8 10.5 2"></polyline></svg></span>
+            <span class="custom-chk-text">
+              <strong>สลับไปดูเดือนเป้าหมายทันทีหลังคัดลอก</strong>
+            </span>
+          </label>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="button ghost" data-close="batch-duplicate-modal">ยกเลิก</button>
+          <button class="button primary" id="batch-dup-submit-btn" type="submit">⎘ คัดลอกรายการที่เลือก</button>
+        </div>
       </form>
     </div>
 
@@ -479,6 +617,6 @@
     <!-- Config loaded from external file (CSP-safe, no inline scripts) -->
     <script src="config.js?v=9"></script>
     <script src="supabase.js?v=9"></script>
-    <script src="app.js?v=9"></script>
+    <script src="app.js?v=10"></script>
   </body>
 </html>

@@ -126,6 +126,21 @@ function incrementMonth(month, n) {
   const dt = new Date(parts[0], parts[1] - 1 + n, 1);
   return dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, "0");
 }
+function getTargetDateForMonth(origDateStr, targetMonthStr) {
+  var origParts = (origDateStr || "").split("-").map(Number);
+  var origDay = origParts[2] || 1;
+  var targetParts = (targetMonthStr || "").split("-").map(Number);
+  var year = targetParts[0];
+  var month = targetParts[1];
+  if (!year || !month) {
+    var now = new Date();
+    year = now.getFullYear();
+    month = now.getMonth() + 1;
+  }
+  var maxDays = new Date(year, month, 0).getDate();
+  var day = Math.min(Math.max(origDay, 1), maxDays);
+  return year + "-" + String(month).padStart(2, "0") + "-" + String(day).padStart(2, "0");
+}
 function monthDiff(start, end) {
   const sp = start.split("-").map(Number), ep = end.split("-").map(Number);
   return (ep[0] - sp[0]) * 12 + ep[1] - sp[1];
@@ -405,6 +420,7 @@ function renderTransactionRow(item, withActions) {
 
   var actions = (!item.source && withActions)
     ? '<div class="tx-actions">'
+      + '<button class="tx-duplicate-btn" data-duplicate-tx="' + item.id + '" title="คัดลอกรายการไปยังเดือนอื่น">⎘</button>'
       + '<button class="tx-edit-btn" data-edit-tx="' + item.id + '" title="แก้ไข">✎</button>'
       + '<button class="tx-delete-btn" data-delete-tx="' + item.id + '" title="ลบ">✕</button>'
       + '</div>'
@@ -896,6 +912,8 @@ function openAddTransaction() {
 
   _id("tx-modal-title").textContent = "เพิ่มรายรับหรือรายจ่าย";
   _id("tx-submit-btn").textContent  = "บันทึกรายการ";
+  var dupModalBtn = _id("tx-dup-modal-btn");
+  if (dupModalBtn) dupModalBtn.style.display = "none";
   openModal("transaction-modal");
 }
 
@@ -921,6 +939,14 @@ function openEditTransaction(id) {
 
   _id("tx-modal-title").textContent = "แก้ไขรายการ";
   _id("tx-submit-btn").textContent  = "บันทึกการแก้ไข";
+  var dupModalBtn = _id("tx-dup-modal-btn");
+  if (dupModalBtn) {
+    dupModalBtn.style.display = "inline-flex";
+    dupModalBtn.onclick = function() {
+      closeModal("transaction-modal");
+      openDuplicateTransaction(id);
+    };
+  }
   openModal("transaction-modal");
 }
 
@@ -1003,8 +1029,14 @@ function handlePaymentCheckboxChange(e) {
 
 /* Edit / Delete action buttons handler */
 function handleTxListClick(e) {
+  var dupBtn  = e.target.closest("[data-duplicate-tx]");
   var delBtn  = e.target.closest("[data-delete-tx]");
   var editBtn = e.target.closest("[data-edit-tx]");
+  if (dupBtn) {
+    var dupId = dupBtn.dataset.duplicateTx;
+    openDuplicateTransaction(dupId);
+    return;
+  }
   if (delBtn) {
     var delId = delBtn.dataset.deleteTx;
     if (!confirm("ลบรายการนี้ใช่ไหม?")) return;
@@ -1027,6 +1059,233 @@ _id("monthly-transactions").addEventListener("click", handleTxListClick);
 _id("monthly-transactions").addEventListener("change", handlePaymentCheckboxChange);
 
 _id("installment-list").addEventListener("change", handlePaymentCheckboxChange);
+
+/* ─── Duplicate Transactions ─────────────────────────────────── */
+var currentDupSourceTx = null;
+
+function openDuplicateTransaction(id) {
+  var item = data.transactions.find(function(t) { return String(t.id) === String(id); });
+  if (!item) return;
+  currentDupSourceTx = item;
+
+  _id("dup-source-id").value = item.id;
+  var baseMonth = item.date ? item.date.slice(0, 7) : selectedMonth;
+  var nextMonth = incrementMonth(baseMonth, 1);
+  _id("dup-target-month").value = nextMonth;
+  _id("dup-target-date").value = getTargetDateForMonth(item.date, nextMonth);
+
+  // Preview card
+  var meta = CATEGORY_META[item.category] || CATEGORY_META.other;
+  var isIncome = item.type === "income";
+  var iconEl = _id("dup-preview-icon");
+  if (iconEl) {
+    iconEl.textContent = meta.icon;
+    iconEl.className = "dup-preview-icon " + (isIncome ? "income" : "expense");
+  }
+  var titleEl = _id("dup-preview-title");
+  if (titleEl) titleEl.textContent = item.title;
+  var metaEl = _id("dup-preview-meta");
+  if (metaEl) metaEl.textContent = meta.label + " · วันที่เดิม " + dateLabel(item.date);
+  var amtEl = _id("dup-preview-amount");
+  if (amtEl) {
+    amtEl.textContent = money(item.amount, isIncome ? "+" : "−");
+    amtEl.className = "dup-preview-amount " + (isIncome ? "income" : "expense");
+  }
+
+  // Reset unpaid toggle (show only for expenses)
+  var paidBox = _id("dup-paid-box");
+  if (paidBox) paidBox.style.display = item.type === "expense" ? "block" : "none";
+  var resetUnpaidChk = _id("dup-reset-unpaid");
+  if (resetUnpaidChk) resetUnpaidChk.checked = true;
+
+  var goToMonthChk = _id("dup-go-to-month");
+  if (goToMonthChk) goToMonthChk.checked = true;
+
+  openModal("duplicate-modal");
+}
+
+_id("duplicate-form").addEventListener("submit", function(e) {
+  e.preventDefault();
+  var form = new FormData(e.currentTarget);
+  var sourceId = form.get("sourceId");
+  var targetMonth = form.get("targetMonth");
+  var targetDate = form.get("targetDate");
+  var resetUnpaid = form.get("resetUnpaid") === "on";
+  var goToTargetMonth = form.get("goToTargetMonth") === "on";
+
+  var orig = data.transactions.find(function(t) { return String(t.id) === String(sourceId); });
+  if (!orig) { toast("⚠️ ไม่พบข้อมูลรายการต้นฉบับ"); return; }
+  if (!targetDate) { toast("⚠️ กรุณาระบุวันที่"); return; }
+
+  var isPaid = orig.type === "expense" ? (resetUnpaid ? false : (orig.is_paid === true)) : false;
+  var newTx = {
+    id: uid(),
+    type: orig.type,
+    title: orig.title,
+    amount: orig.amount,
+    category: orig.category,
+    date: targetDate,
+    note: orig.note || "",
+    is_paid: isPaid
+  };
+
+  data.transactions.push(newTx);
+  cloudSyncTx("add", null, newTx);
+  saveData();
+
+  if (goToTargetMonth && targetMonth) {
+    selectedMonth = targetMonth;
+  }
+  render();
+  switchPage(activePage);
+  closeModal("duplicate-modal");
+  toast("⎘ คัดลอกรายการไปยัง " + monthLabel(targetMonth) + " แล้ว");
+});
+
+_id("dup-target-month").addEventListener("change", function() {
+  if (currentDupSourceTx && this.value) {
+    _id("dup-target-date").value = getTargetDateForMonth(currentDupSourceTx.date, this.value);
+  }
+});
+_id("dup-target-date").addEventListener("change", function() {
+  if (this.value) {
+    _id("dup-target-month").value = this.value.slice(0, 7);
+  }
+});
+document.querySelectorAll("[data-dup-add-months]").forEach(function(btn) {
+  btn.addEventListener("click", function() {
+    var add = Number(btn.dataset.dupAddMonths || 1);
+    var baseMonth = (currentDupSourceTx && currentDupSourceTx.date)
+      ? currentDupSourceTx.date.slice(0, 7)
+      : selectedMonth;
+    var nextM = incrementMonth(baseMonth, add);
+    _id("dup-target-month").value = nextM;
+    if (currentDupSourceTx) {
+      _id("dup-target-date").value = getTargetDateForMonth(currentDupSourceTx.date, nextM);
+    }
+  });
+});
+
+/* ─── Batch Duplicate ────────────────────────────────────────── */
+function updateBatchCount() {
+  var allChks = document.querySelectorAll(".batch-item-chk");
+  var checkedChks = document.querySelectorAll(".batch-item-chk:checked");
+  var countEl = _id("batch-selected-count");
+  if (countEl) countEl.textContent = "เลือก " + checkedChks.length + " / " + allChks.length + " รายการ";
+  var submitBtn = _id("batch-dup-submit-btn");
+  if (submitBtn) {
+    submitBtn.disabled = checkedChks.length === 0;
+    submitBtn.textContent = checkedChks.length ? ("⎘ คัดลอก " + checkedChks.length + " รายการ") : "กรุณาเลือกอย่างน้อย 1 รายการ";
+  }
+}
+
+function renderBatchItemsList(list) {
+  var container = _id("batch-items-list");
+  if (!container) return;
+  container.innerHTML = list.map(function(item) {
+    var meta = CATEGORY_META[item.category] || CATEGORY_META.other;
+    var isInc = item.type === "income";
+    return '<label class="batch-item-row">'
+      + '<input type="checkbox" class="batch-item-chk" value="' + item.id + '" checked>'
+      + '<span class="transaction-icon ' + (isInc ? 'income' : '') + '" style="width:28px;height:28px;font-size:13px">' + meta.icon + '</span>'
+      + '<div class="batch-item-info">'
+      + '<strong>' + escapeHtml(item.title) + '</strong>'
+      + '<small>' + meta.label + ' · ' + dateLabel(item.date) + '</small>'
+      + '</div>'
+      + '<span class="batch-item-amount ' + (isInc ? 'income' : 'expense') + '">' + money(item.amount, isInc ? '+' : '−') + '</span>'
+      + '</label>';
+  }).join("");
+
+  updateBatchCount();
+
+  container.querySelectorAll(".batch-item-chk").forEach(function(chk) {
+    chk.addEventListener("change", updateBatchCount);
+  });
+}
+
+function openBatchDuplicate() {
+  var list = data.transactions.filter(function(t) { return t.date.slice(0, 7) === selectedMonth; });
+  if (!list.length) {
+    toast("ยังไม่มีรายการใน " + monthLabel(selectedMonth) + " ให้คัดลอก");
+    return;
+  }
+
+  _id("batch-dup-source-month-display").value = monthLabel(selectedMonth);
+  var nextM = incrementMonth(selectedMonth, 1);
+  _id("batch-dup-target-month").value = nextM;
+
+  renderBatchItemsList(list);
+  openModal("batch-duplicate-modal");
+}
+
+_id("batch-select-all-btn").addEventListener("click", function() {
+  document.querySelectorAll(".batch-item-chk").forEach(function(chk) { chk.checked = true; });
+  updateBatchCount();
+});
+_id("batch-unselect-all-btn").addEventListener("click", function() {
+  document.querySelectorAll(".batch-item-chk").forEach(function(chk) { chk.checked = false; });
+  updateBatchCount();
+});
+
+document.querySelectorAll("[data-batch-add-months]").forEach(function(btn) {
+  btn.addEventListener("click", function() {
+    var add = Number(btn.dataset.batchAddMonths || 1);
+    var nextM = incrementMonth(selectedMonth, add);
+    _id("batch-dup-target-month").value = nextM;
+  });
+});
+
+_id("batch-duplicate-form").addEventListener("submit", function(e) {
+  e.preventDefault();
+  var form = new FormData(e.currentTarget);
+  var targetMonth = form.get("batchTargetMonth");
+  var resetUnpaid = form.get("batchResetUnpaid") === "on";
+  var goToTarget = form.get("batchGoToTarget") === "on";
+
+  var checkedIds = Array.from(document.querySelectorAll(".batch-item-chk:checked")).map(function(c) { return c.value; });
+  if (!checkedIds.length) {
+    toast("⚠️ กรุณาเลือกรายการที่ต้องการคัดลอก");
+    return;
+  }
+  if (!targetMonth) {
+    toast("⚠️ กรุณาเลือกเดือนเป้าหมาย");
+    return;
+  }
+
+  var copiedCount = 0;
+  for (var i = 0; i < checkedIds.length; i++) {
+    var id = checkedIds[i];
+    var orig = data.transactions.find(function(t) { return String(t.id) === String(id); });
+    if (!orig) continue;
+    var targetDate = getTargetDateForMonth(orig.date, targetMonth);
+    var isPaid = orig.type === "expense" ? (resetUnpaid ? false : (orig.is_paid === true)) : false;
+    var newTx = {
+      id: uid(),
+      type: orig.type,
+      title: orig.title,
+      amount: orig.amount,
+      category: orig.category,
+      date: targetDate,
+      note: orig.note || "",
+      is_paid: isPaid
+    };
+    data.transactions.push(newTx);
+    cloudSyncTx("add", null, newTx);
+    copiedCount++;
+  }
+
+  saveData();
+  if (goToTarget && targetMonth) {
+    selectedMonth = targetMonth;
+  }
+  render();
+  switchPage(activePage);
+  closeModal("batch-duplicate-modal");
+  toast("⎘ คัดลอก " + copiedCount + " รายการไปยัง " + monthLabel(targetMonth) + " แล้ว");
+});
+
+var openBatchBtn = _id("open-batch-duplicate");
+if (openBatchBtn) openBatchBtn.addEventListener("click", openBatchDuplicate);
 
 /* ─── Installment modal — auto-calculation ───────────────────── */
 var _instCalcLock = false;   /* prevent circular update */
