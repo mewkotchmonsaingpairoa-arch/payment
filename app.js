@@ -315,7 +315,8 @@ function monthlyTotals() {
   paid = Math.round(paid * 100) / 100;
   installment = Math.round(installment * 100) / 100;
   var balance = Math.round((income - expense) * 100) / 100;
-  return { income: income, expense: expense, paid: paid, installment: installment, balance: balance, list: list };
+  var cashOnHand = Math.round((income - paid) * 100) / 100;
+  return { income: income, expense: expense, paid: paid, installment: installment, balance: balance, cashOnHand: cashOnHand, list: list };
 }
 
 /* ─── Category selects ───────────────────────────────────────── */
@@ -521,9 +522,9 @@ function renderDashboard() {
   var max = Math.max(totals.income, totals.expense, 1);
   _id("income-bar").style.width  = Math.max(3, totals.income / max * 100) + "%";
   _id("expense-bar").style.width = Math.max(3, totals.expense / max * 100) + "%";
-  _id("cashflow-insight").innerHTML = totals.balance >= 0
-    ? "เดือนนี้เหลือเงิน <strong>" + money(totals.balance) + "</strong> หลังหักรายจ่ายทั้งหมดแล้ว"
-    : "เดือนนี้เกินงบ <strong>" + money(Math.abs(totals.balance)) + "</strong> ลองตรวจสอบรายจ่ายเพิ่มเติม";
+  _id("cashflow-insight").innerHTML = totals.cashOnHand >= 0
+    ? "เดือนนี้เหลือเงิน <strong>" + money(totals.cashOnHand) + "</strong> หลังหักยอดที่จ่ายแล้ว"
+    : "เดือนนี้เกินงบ <strong>" + money(Math.abs(totals.cashOnHand)) + "</strong> ลองตรวจสอบรายจ่ายเพิ่มเติม";
   _id("monthly-list-subtitle").textContent = totals.list.length + " รายการใน" + monthLabel();
   _id("monthly-transactions").innerHTML = totals.list.length
     ? totals.list.slice(0, 5).map(function(item) { return renderTransactionRow(item, true); }).join("")
