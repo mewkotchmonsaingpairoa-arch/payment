@@ -53,12 +53,31 @@ const CAT_STORAGE_KEY = "pocketbloom-cats-v1";
 const CAT_ICONS  = ["●","◆","▤","★","❤","✔","○","⋆","⊙","↵","⌂","⟂","⏁","☄","✎","▫","♪","☀","✈","⚽"];
 const CAT_COLORS = ["#f29b52","#6388d8","#8d77d5","#e7809b","#4bb59b","#e5a54b","#5db8de","#e87272","#7dc98f","#9da7b9","#21a67a","#3e9d7d","#c56ba8","#d4885a","#6cb3e0"];
 
-/* ─── UUID fallback (works on file:// too) ───────────────────── */
+/* ─── UUID Helper (Generates standard RFC4122 v4 UUID) ───────── */
+function isUUID(str) {
+  return typeof str === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
+}
+
 function uid() {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    try { return crypto.randomUUID(); } catch (_) {}
+  if (typeof crypto !== "undefined") {
+    if (typeof crypto.randomUUID === "function") {
+      try { return crypto.randomUUID(); } catch (_) {}
+    }
+    if (typeof crypto.getRandomValues === "function") {
+      try {
+        var bytes = new Uint8Array(16);
+        crypto.getRandomValues(bytes);
+        bytes[6] = (bytes[6] & 0x0f) | 0x40; // v4
+        bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant RFC4122
+        var hex = Array.from(bytes).map(function(b) { return b.toString(16).padStart(2, "0"); }).join("");
+        return hex.slice(0,8) + "-" + hex.slice(8,12) + "-" + hex.slice(12,16) + "-" + hex.slice(16,20) + "-" + hex.slice(20);
+      } catch (_) {}
+    }
   }
-  return "id-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 11);
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
 }
 
 /* ─── State ──────────────────────────────────────────────────── */
@@ -113,11 +132,30 @@ async function cloudSyncNote(op, id, note) {
   if (!_useCloud || !_currentUser || !window.SupabaseDB) return;
   _isSyncing = true;
   try {
-    if (op === "add")    { var saved = await window.SupabaseDB.addNote(note); if (saved && saved.id) note.id = saved.id; }
-    if (op === "update") { await window.SupabaseDB.updateNote(id, note); }
-    if (op === "delete") { await window.SupabaseDB.deleteNote(id); }
-  } catch (err) { console.warn("Cloud sync NOTE:", err.message); }
-  finally { setTimeout(function() { _isSyncing = false; }, 1500); }
+    if (op === "add") {
+      var saved = await window.SupabaseDB.addNote(note);
+      if (saved && saved.id) {
+        note.id = saved.id;
+        saveData();
+        renderNotes();
+      }
+    }
+    if (op === "update") {
+      var updated = await window.SupabaseDB.updateNote(id, note);
+      if (updated && updated.id && updated.id !== note.id) {
+        note.id = updated.id;
+        saveData();
+        renderNotes();
+      }
+    }
+    if (op === "delete") {
+      await window.SupabaseDB.deleteNote(id, note);
+    }
+  } catch (err) {
+    console.warn("Cloud sync NOTE:", err.message);
+  } finally {
+    setTimeout(function() { _isSyncing = false; }, 1500);
+  }
 }
 
 /* ─── Helpers (declared first so defaultData can use them) ───── */
@@ -147,11 +185,18 @@ function monthDiff(start, end) {
 }
 function money(v, sign) {
   sign = sign || "";
-  var num = Number(v || 0);
-  return sign + "฿" + num.toLocaleString("th-TH", {
-    minimumFractionDigits: Number.isInteger(num) ? 0 : 2,
+  var num = Math.round(Number(v || 0) * 100) / 100;
+  if (Object.is(num, -0)) num = 0;
+  var isNeg = num < 0;
+  var absNum = Math.abs(num);
+  var formatted = absNum.toLocaleString("th-TH", {
+    minimumFractionDigits: Number.isInteger(absNum) ? 0 : 2,
     maximumFractionDigits: 2
   });
+  if (sign) {
+    return sign + "฿" + formatted;
+  }
+  return (isNeg ? "−฿" : "฿") + formatted;
 }
 function monthLabel(val) {
   val = val || selectedMonth;
@@ -193,13 +238,15 @@ function loadData() {
       parsed.installments = parsed.installments || [];
       parsed.notes        = parsed.notes        || [];
       parsed.debts        = parsed.debts        || [];
+      (parsed.notes || []).forEach(function(n) {
+        if (!isUUID(n.id)) n.id = uid();
+      });
       return parsed;
     }
   } catch (e) { console.warn("Could not load data:", e); }
   return defaultData();
 }
 function saveData() {
-  if (typeof _useCloud !== "undefined" && _useCloud && _currentUser) return;   /* cloud is source of truth */
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
   catch (e) { console.warn("Could not save data:", e); }
 }
@@ -249,11 +296,16 @@ function monthlyTotals() {
   var list = monthlyTransactions();
   var income = 0, expense = 0, installment = 0;
   list.forEach(function(x) {
-    if (x.type === "income")  income += x.amount;
-    if (x.type === "expense") expense += x.amount;
-    if (x.source === "installment") installment += x.amount;
+    var amt = Number(x.amount) || 0;
+    if (x.type === "income")  income += amt;
+    if (x.type === "expense") expense += amt;
+    if (x.source === "installment") installment += amt;
   });
-  return { income: income, expense: expense, installment: installment, balance: income - expense, list: list };
+  income = Math.round(income * 100) / 100;
+  expense = Math.round(expense * 100) / 100;
+  installment = Math.round(installment * 100) / 100;
+  var balance = Math.round((income - expense) * 100) / 100;
+  return { income: income, expense: expense, installment: installment, balance: balance, list: list };
 }
 
 /* ─── Category selects ───────────────────────────────────────── */
@@ -449,7 +501,11 @@ function renderDashboard() {
   _id("income-total").textContent  = money(totals.income);
   _id("expense-total").textContent = money(totals.expense);
   _id("installment-in-expense").textContent = money(totals.installment);
-  _id("balance-note").textContent  = totals.balance >= 0 ? "รายรับมากกว่ารายจ่าย" : "รายจ่ายมากกว่ารายรับ";
+  _id("balance-note").textContent  = totals.balance > 0
+    ? "รายรับมากกว่ารายจ่าย"
+    : totals.balance === 0
+      ? "รายรับเท่ากับรายจ่ายพอดี"
+      : "รายจ่ายมากกว่ารายรับ";
   _id("chart-income").textContent  = money(totals.income);
   _id("chart-expense").textContent = money(totals.expense);
   var max = Math.max(totals.income, totals.expense, 1);
@@ -468,12 +524,15 @@ function renderDashboard() {
 
 function renderCategoryChart(expenses, total) {
   var grouped = {};
-  expenses.forEach(function(x) { grouped[x.category] = (grouped[x.category] || 0) + x.amount; });
+  expenses.forEach(function(x) {
+    var amt = Number(x.amount || 0);
+    grouped[x.category] = Math.round(((grouped[x.category] || 0) + amt) * 100) / 100;
+  });
   var entries = Object.entries(grouped).sort(function(a,b) { return b[1]-a[1]; });
   var donut  = _id("category-donut");
   var legend = _id("category-legend");
   _id("donut-total").textContent = money(total);
-  if (!entries.length) {
+  if (!entries.length || total <= 0) {
     donut.style.background = "conic-gradient(#e8ecf3 0deg 360deg)";
     legend.innerHTML = "<small style='color:#8b94a5'>ยังไม่มีรายจ่าย</small>";
     return;
@@ -508,23 +567,36 @@ function renderQuestProgress() {
 }
 
 /* ─── Render: Transactions page summary cards ────────────────── */
-function renderTxSummary() {
-  var totals = monthlyTotals();
+function renderTxSummary(filteredList) {
   var allList = monthlyTransactions();
+  var targetList = filteredList || allList;
   var incEl  = _id("tx-sum-income");
   var expEl  = _id("tx-sum-expense");
   var balEl  = _id("tx-sum-balance");
   var cntEl  = _id("tx-sum-count");
   if (!incEl) return;
-  incEl.textContent = money(totals.income);
-  expEl.textContent = money(totals.expense);
-  balEl.textContent = money(totals.balance);
+
+  var income = 0, expense = 0;
+  targetList.forEach(function(x) {
+    var amt = Number(x.amount) || 0;
+    if (x.type === "income")  income += amt;
+    if (x.type === "expense") expense += amt;
+  });
+  income = Math.round(income * 100) / 100;
+  expense = Math.round(expense * 100) / 100;
+  var balance = Math.round((income - expense) * 100) / 100;
+
+  incEl.textContent = money(income);
+  expEl.textContent = money(expense);
+  balEl.textContent = money(balance);
   // Highlight balance card color
   var balCard = balEl.closest(".tx-sum-card");
   if (balCard) {
-    balCard.classList.toggle("tx-sum-balance-neg", totals.balance < 0);
+    balCard.classList.toggle("tx-sum-balance-neg", balance < 0);
   }
-  cntEl.textContent = allList.length + " รายการ";
+  cntEl.textContent = (txFilter === "all" || targetList.length === allList.length)
+    ? allList.length + " รายการ"
+    : targetList.length + " / " + allList.length + " รายการ";
 }
 
 /* ─── Render: All transactions ───────────────────────────────── */
@@ -548,14 +620,18 @@ function renderAllTransactions() {
   _id("all-transactions").innerHTML = list.length
     ? list.map(function(item) { return renderTransactionRow(item, true); }).join("")
     : emptyMarkup("ไม่พบรายการตามเงื่อนไขที่เลือกในเดือนนี้");
-  renderTxSummary();
+  renderTxSummary(list);
 }
 
 /* ─── Render: Installments ───────────────────────────────────── */
 function renderInstallments() {
   var active   = data.installments.filter(function(item) { return paidInstallments(item) < item.months; });
-  var monthly  = installmentsForMonth().reduce(function(s,x) { return s + x.amount; }, 0);
-  var totalLeft = active.reduce(function(s,x) { return s + x.amount * (x.months - paidInstallments(x)); }, 0);
+  var monthly  = installmentsForMonth().filter(function(x) {
+    return paidInstallments(x.installment) < x.installment.months;
+  }).reduce(function(s,x) { return s + Number(x.amount || 0); }, 0);
+  monthly = Math.round(monthly * 100) / 100;
+  var totalLeft = active.reduce(function(s,x) { return s + Number(x.amount || 0) * (x.months - paidInstallments(x)); }, 0);
+  totalLeft = Math.round(totalLeft * 100) / 100;
 
   _id("installment-summary").innerHTML =
     '<article class="installment-metric"><span>ยอดผ่อนของ' + monthLabel() + '</span><strong>' + money(monthly) + '</strong></article>'
@@ -584,8 +660,8 @@ function renderInstallments() {
                  : isActive                ? "กำลังผ่อน"
                  : monthDiff(item.startMonth, selectedMonth) < 0 ? "ยังไม่เริ่ม"
                  : "รอติดตาม";
-    var paidAmt  = progress * item.amount;
-    var leftAmt  = (item.months - progress) * item.amount;
+    var paidAmt  = Math.round(progress * Number(item.amount || 0) * 100) / 100;
+    var leftAmt  = Math.round((item.months - progress) * Number(item.amount || 0) * 100) / 100;
     var pct      = Math.min((progress / item.months) * 100, 100).toFixed(1);
     var meta     = CATEGORY_META[item.category] || CATEGORY_META.other;
     var pillClass = progress >= item.months ? "pill pill-done" : "pill";
@@ -638,10 +714,12 @@ function debtTotals() {
     if (d.isSettled || pAmt >= amt) settledCount++;
     else activeCount++;
   });
+  total = Math.round(total * 100) / 100;
+  paid  = Math.round(paid * 100) / 100;
   return {
     total: total,
     paid: paid,
-    remaining: Math.max(total - paid, 0),
+    remaining: Math.max(Math.round((total - paid) * 100) / 100, 0),
     count: count,
     activeCount: activeCount,
     settledCount: settledCount
@@ -1303,11 +1381,12 @@ function updateInstCalcPreview() {
   var tot    = parseFloat(totEl.value)  || 0;
   var months = parseInt(monthsEl.value) || 0;
   if (amt > 0 && months > 0) {
+    var displayTotal = (tot > 0) ? tot : (Math.round(amt * months * 100) / 100);
     preview.style.display = "";
     preview.innerHTML =
       '<span class="inst-preview-row"><span>ยอดต่องวด</span><strong>' + money(amt) + '</strong></span>'
       + '<span class="inst-preview-row"><span>จำนวนงวด</span><strong>' + months + ' งวด</strong></span>'
-      + '<span class="inst-preview-row highlight"><span>ยอดรวมทั้งหมด</span><strong>' + money(amt * months) + '</strong></span>';
+      + '<span class="inst-preview-row highlight"><span>ยอดรวมทั้งหมด</span><strong>' + money(displayTotal) + '</strong></span>';
   } else {
     preview.style.display = "none";
   }
@@ -1557,9 +1636,11 @@ _id("notes-list").addEventListener("click", function(e) {
   if (!delBtn) return;
   var delId = delBtn.dataset.deleteNote;
   if (!confirm("ลบบันทึกนี้ใช่ไหม?")) return;
+  var targetNote = data.notes.find(function(n) { return String(n.id) === String(delId); });
   data.notes = data.notes.filter(function(n) { return String(n.id) !== String(delId); });
-  cloudSyncNote("delete", delId, null);
-  saveData(); render();
+  cloudSyncNote("delete", delId, targetNote);
+  saveData();
+  renderNotes();
   toast("ลบบันทึกความจำแล้ว");
 });
 
@@ -2014,13 +2095,22 @@ document.addEventListener("supabase:ready", async function() {
         await window.SupabaseMigration.migrateFromLocalStorage(STORAGE_KEY);
 
         var cloudData = await window.SupabaseDB.loadAll();
-        if (cloudData.transactions.length || cloudData.installments.length || cloudData.notes.length || (cloudData.debts && cloudData.debts.length)) {
-          data.transactions = cloudData.transactions;
-          data.installments = cloudData.installments;
-          data.notes        = cloudData.notes;
-          data.debts        = cloudData.debts || [];
-          saveData(); // keep localStorage in sync
+        if (cloudData.transactions) data.transactions = cloudData.transactions;
+        if (cloudData.installments) data.installments = cloudData.installments;
+        if (cloudData.debts)        data.debts        = cloudData.debts;
+
+        // Notes sync: If cloud has notes, use them. If cloud has no notes but local has notes, upload local notes to cloud!
+        if (cloudData.notes && cloudData.notes.length) {
+          data.notes = cloudData.notes;
+        } else if (data.notes && data.notes.length) {
+          for (var i = 0; i < data.notes.length; i++) {
+            try {
+              var uploaded = await window.SupabaseDB.addNote(data.notes[i]);
+              if (uploaded && uploaded.id) data.notes[i].id = uploaded.id;
+            } catch (_) {}
+          }
         }
+        saveData(); // keep localStorage in sync
         render();
         toast("ยินดีต้อนรับ " + (user.user_metadata?.display_name || user.email.split("@")[0]));
 

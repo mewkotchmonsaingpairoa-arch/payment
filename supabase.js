@@ -82,6 +82,11 @@ const SupabaseAuth = {
 /* ══════════════════════════════════════════════════════════════
    DATABASE
    ══════════════════════════════════════════════════════════════ */
+/* ── Helpers: UUID check ────────────────────────────────────── */
+function isUUID(str) {
+  return typeof str === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
+}
+
 const SupabaseDB = {
 
   /* ── Transactions ──────────────────────────────────────────── */
@@ -160,15 +165,34 @@ const SupabaseDB = {
   },
   async updateNote(id, note) {
     const [c, user] = await _cu(); _requireUser(user);
-    const { data, error } = await c.from("notes")
-      .update(_noteToDB(note, user.id)).eq("id", id).eq("user_id", user.id).select().single();
-    if (error) throw error;
-    return _noteFromDB(data);
+    const dbPayload = _noteToDB(note, user.id);
+    if (isUUID(id)) {
+      const { data, error } = await c.from("notes")
+        .update(dbPayload).eq("id", id).eq("user_id", user.id).select();
+      if (!error && data && data.length > 0) return _noteFromDB(data[0]);
+    }
+    // Fallback: If id wasn't a UUID or didn't match row, try updating by title
+    if (note && note.title) {
+      const { data: byTitle, error: errTitle } = await c.from("notes")
+        .update(dbPayload).eq("title", note.title).eq("user_id", user.id).select();
+      if (!errTitle && byTitle && byTitle.length > 0) return _noteFromDB(byTitle[0]);
+    }
+    // If not found, insert as new note (upsert)
+    const { data: insData, error: insErr } = await c.from("notes")
+      .insert([dbPayload]).select().single();
+    if (insErr) throw insErr;
+    return _noteFromDB(insData);
   },
-  async deleteNote(id) {
+  async deleteNote(id, note) {
     const [c, user] = await _cu(); _requireUser(user);
-    const { error } = await c.from("notes").delete().eq("id", id).eq("user_id", user.id);
-    if (error) throw error;
+    let deleted = false;
+    if (isUUID(id)) {
+      const { error, count } = await c.from("notes").delete({ count: "exact" }).eq("id", id).eq("user_id", user.id);
+      if (!error && count > 0) deleted = true;
+    }
+    if (!deleted && note && note.title) {
+      await c.from("notes").delete().eq("title", note.title).eq("user_id", user.id);
+    }
   },
 
   /* ── Cash Debts ────────────────────────────────────────────── */
@@ -267,7 +291,7 @@ const SupabaseRealtime = {
 };
 
 /* ══════════════════════════════════════════════════════════════
-   MIGRATION  localStorage → Supabase  (FIX: await each insert)
+   MIGRATION  localStorage → Supabase
    ══════════════════════════════════════════════════════════════ */
 const SupabaseMigration = {
   async migrateFromLocalStorage(storageKey) {
@@ -281,18 +305,23 @@ const SupabaseMigration = {
 
     const c = await getClient();
 
-    // Check if already has data
-    const { count } = await c.from("transactions")
-      .select("id", { count: "exact", head: true }).eq("user_id", user.id);
-    if (count > 0) return { migrated: false, reason: "already has data" };
+    // Migrate each table independently if cloud has no records yet
+    const { count: txCount } = await c.from("transactions").select("id", { count: "exact", head: true }).eq("user_id", user.id);
+    const txInserts = (txCount === 0) ? (local.transactions || []).map(tx => c.from("transactions").insert(_txToDB(tx, user.id))) : [];
 
-    // build proper Promises by awaiting each query
-    const txInserts   = (local.transactions || []).map(tx   => c.from("transactions").insert(_txToDB(tx, user.id)));
-    const instInserts = (local.installments || []).map(inst => c.from("installments").insert(_instToDB(inst, user.id)));
-    const noteInserts = (local.notes        || []).map(note => c.from("notes").insert(_noteToDB(note, user.id)));
-    const debtInserts = (local.debts        || []).map(debt => c.from("debts").insert(_debtToDB(debt, user.id)));
+    const { count: instCount } = await c.from("installments").select("id", { count: "exact", head: true }).eq("user_id", user.id);
+    const instInserts = (instCount === 0) ? (local.installments || []).map(inst => c.from("installments").insert(_instToDB(inst, user.id))) : [];
 
-    const results = await Promise.allSettled([...txInserts, ...instInserts, ...noteInserts, ...debtInserts]);
+    const { count: noteCount } = await c.from("notes").select("id", { count: "exact", head: true }).eq("user_id", user.id);
+    const noteInserts = (noteCount === 0) ? (local.notes || []).map(note => c.from("notes").insert(_noteToDB(note, user.id))) : [];
+
+    const { count: debtCount } = await c.from("debts").select("id", { count: "exact", head: true }).eq("user_id", user.id);
+    const debtInserts = (debtCount === 0) ? (local.debts || []).map(debt => c.from("debts").insert(_debtToDB(debt, user.id))) : [];
+
+    const allOps = [...txInserts, ...instInserts, ...noteInserts, ...debtInserts];
+    if (!allOps.length) return { migrated: false, reason: "already synchronized" };
+
+    const results = await Promise.allSettled(allOps);
     const failed  = results.filter(r => r.status === "rejected" || r.value?.error);
 
     if (!failed.length) {
@@ -314,17 +343,29 @@ function _requireUser(user) {
   if (!user) throw new Error("ยังไม่ได้เข้าสู่ระบบ");
 }
 
-function _txToDB(tx, uid)  { return { user_id: uid, type: tx.type, title: tx.title, amount: +tx.amount, category: tx.category, date: tx.date, note: tx.note || "", is_paid: tx.type === "expense" ? Boolean(tx.is_paid) : false }; }
+function _txToDB(tx, uid)  {
+  const row = { user_id: uid, type: tx.type, title: tx.title, amount: +tx.amount, category: tx.category, date: tx.date, note: tx.note || "", is_paid: tx.type === "expense" ? Boolean(tx.is_paid) : false };
+  if (isUUID(tx.id)) row.id = tx.id;
+  return row;
+}
 function _txFromDB(r)      { return { id: r.id, type: r.type, title: r.title, amount: +r.amount, category: r.category, date: r.date, note: r.note || "", is_paid: Boolean(r.is_paid) }; }
 
-function _instToDB(i, uid) { return { user_id: uid, title: i.title, amount: +i.amount, months: +i.months, paid_count: +(i.paidCount||0), start_month: i.startMonth, category: i.category }; }
+function _instToDB(i, uid) {
+  const row = { user_id: uid, title: i.title, amount: +i.amount, months: +i.months, paid_count: +(i.paidCount||0), start_month: i.startMonth, category: i.category };
+  if (isUUID(i.id)) row.id = i.id;
+  return row;
+}
 function _instFromDB(r)    { return { id: r.id, title: r.title, amount: +r.amount, months: +r.months, paidCount: +(r.paid_count||0), startMonth: r.start_month, category: r.category }; }
 
-function _noteToDB(n, uid) { return { user_id: uid, title: n.title, content: n.content, date: n.date || null }; }
+function _noteToDB(n, uid) {
+  const row = { user_id: uid, title: n.title, content: n.content, date: n.date || null };
+  if (isUUID(n.id)) row.id = n.id;
+  return row;
+}
 function _noteFromDB(r)    { return { id: r.id, title: r.title, content: r.content, date: r.date || "", createdAt: r.created_at }; }
 
 function _debtToDB(d, uid) {
-  return {
+  const row = {
     user_id: uid,
     title: d.title,
     lender: d.lender || "",
@@ -335,6 +376,8 @@ function _debtToDB(d, uid) {
     note: d.note || "",
     is_settled: Boolean(d.isSettled)
   };
+  if (isUUID(d.id)) row.id = d.id;
+  return row;
 }
 function _debtFromDB(r) {
   return {
