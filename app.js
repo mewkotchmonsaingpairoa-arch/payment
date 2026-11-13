@@ -314,7 +314,7 @@ function monthlyTotals() {
   expense = Math.round(expense * 100) / 100;
   paid = Math.round(paid * 100) / 100;
   installment = Math.round(installment * 100) / 100;
-  var balance = Math.round((income - paid) * 100) / 100;
+  var balance = Math.round((income - expense) * 100) / 100;
   return { income: income, expense: expense, paid: paid, installment: installment, balance: balance, list: list };
 }
 
@@ -512,18 +512,18 @@ function renderDashboard() {
   _id("expense-total").textContent = money(totals.expense);
   _id("installment-in-expense").textContent = money(totals.installment);
   _id("balance-note").textContent  = totals.balance > 0
-    ? "รายรับมากกว่ายอดที่จ่ายแล้ว"
+    ? "รายรับมากกว่ารายจ่าย"
     : totals.balance === 0
-      ? "รายรับเท่ากับยอดที่จ่ายแล้วพอดี"
-      : "ยอดที่จ่ายแล้วเกินรายรับ";
+      ? "รายรับเท่ากับรายจ่ายพอดี"
+      : "รายจ่ายมากกว่ารายรับ";
   _id("chart-income").textContent  = money(totals.income);
   _id("chart-expense").textContent = money(totals.expense);
   var max = Math.max(totals.income, totals.expense, 1);
   _id("income-bar").style.width  = Math.max(3, totals.income / max * 100) + "%";
   _id("expense-bar").style.width = Math.max(3, totals.expense / max * 100) + "%";
   _id("cashflow-insight").innerHTML = totals.balance >= 0
-    ? "เดือนนี้เหลือเงิน <strong>" + money(totals.balance) + "</strong> หลังหักยอดที่จ่ายแล้ว"
-    : "เดือนนี้เกินงบ <strong>" + money(Math.abs(totals.balance)) + "</strong> หลังหักยอดที่จ่ายแล้ว";
+    ? "เดือนนี้เหลือเงิน <strong>" + money(totals.balance) + "</strong> หลังหักรายจ่ายทั้งหมดแล้ว"
+    : "เดือนนี้เกินงบ <strong>" + money(Math.abs(totals.balance)) + "</strong> ลองตรวจสอบรายจ่ายเพิ่มเติม";
   _id("monthly-list-subtitle").textContent = totals.list.length + " รายการใน" + monthLabel();
   _id("monthly-transactions").innerHTML = totals.list.length
     ? totals.list.slice(0, 5).map(function(item) { return renderTransactionRow(item, true); }).join("")
