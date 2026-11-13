@@ -294,18 +294,28 @@ function monthlyTransactions(month) {
 
 function monthlyTotals() {
   var list = monthlyTransactions();
-  var income = 0, expense = 0, installment = 0;
+  var income = 0, expense = 0, paid = 0, installment = 0;
   list.forEach(function(x) {
     var amt = Number(x.amount) || 0;
     if (x.type === "income")  income += amt;
-    if (x.type === "expense") expense += amt;
+    if (x.type === "expense") {
+      expense += amt;
+      var isPaid = false;
+      if (x.source === "installment") {
+        isPaid = paidInstallments(x.installment) >= x.installmentNumber;
+      } else {
+        isPaid = x.is_paid === true;
+      }
+      if (isPaid) paid += amt;
+    }
     if (x.source === "installment") installment += amt;
   });
   income = Math.round(income * 100) / 100;
   expense = Math.round(expense * 100) / 100;
+  paid = Math.round(paid * 100) / 100;
   installment = Math.round(installment * 100) / 100;
-  var balance = Math.round((income - expense) * 100) / 100;
-  return { income: income, expense: expense, installment: installment, balance: balance, list: list };
+  var balance = Math.round((income - paid) * 100) / 100;
+  return { income: income, expense: expense, paid: paid, installment: installment, balance: balance, list: list };
 }
 
 /* ─── Category selects ───────────────────────────────────────── */
@@ -502,18 +512,18 @@ function renderDashboard() {
   _id("expense-total").textContent = money(totals.expense);
   _id("installment-in-expense").textContent = money(totals.installment);
   _id("balance-note").textContent  = totals.balance > 0
-    ? "รายรับมากกว่ารายจ่าย"
+    ? "รายรับมากกว่ายอดที่จ่ายแล้ว"
     : totals.balance === 0
-      ? "รายรับเท่ากับรายจ่ายพอดี"
-      : "รายจ่ายมากกว่ารายรับ";
+      ? "รายรับเท่ากับยอดที่จ่ายแล้วพอดี"
+      : "ยอดที่จ่ายแล้วเกินรายรับ";
   _id("chart-income").textContent  = money(totals.income);
   _id("chart-expense").textContent = money(totals.expense);
   var max = Math.max(totals.income, totals.expense, 1);
   _id("income-bar").style.width  = Math.max(3, totals.income / max * 100) + "%";
   _id("expense-bar").style.width = Math.max(3, totals.expense / max * 100) + "%";
   _id("cashflow-insight").innerHTML = totals.balance >= 0
-    ? "เดือนนี้เหลือเงิน <strong>" + money(totals.balance) + "</strong> หลังหักรายจ่ายทั้งหมดแล้ว"
-    : "เดือนนี้เกินงบ <strong>" + money(Math.abs(totals.balance)) + "</strong> ลองตรวจสอบรายจ่ายเพิ่มเติม";
+    ? "เดือนนี้เหลือเงิน <strong>" + money(totals.balance) + "</strong> หลังหักยอดที่จ่ายแล้ว"
+    : "เดือนนี้เกินงบ <strong>" + money(Math.abs(totals.balance)) + "</strong> หลังหักยอดที่จ่ายแล้ว";
   _id("monthly-list-subtitle").textContent = totals.list.length + " รายการใน" + monthLabel();
   _id("monthly-transactions").innerHTML = totals.list.length
     ? totals.list.slice(0, 5).map(function(item) { return renderTransactionRow(item, true); }).join("")
@@ -568,7 +578,8 @@ function renderQuestProgress() {
 
 /* ─── Render: Transactions page summary cards ────────────────── */
 function renderTxSummary(filteredList) {
-  var allList = monthlyTransactions();
+  var totals = monthlyTotals();
+  var allList = totals.list;
   var targetList = filteredList || allList;
   var incEl  = _id("tx-sum-income");
   var expEl  = _id("tx-sum-expense");
@@ -577,35 +588,14 @@ function renderTxSummary(filteredList) {
   var cntEl  = _id("tx-sum-count");
   if (!incEl) return;
 
-  var income = 0, expense = 0, paid = 0;
-  targetList.forEach(function(x) {
-    var amt = Number(x.amount) || 0;
-    if (x.type === "income")  income += amt;
-    if (x.type === "expense") {
-      expense += amt;
-      var isPaid = false;
-      if (x.source === "installment") {
-        isPaid = paidInstallments(x.installment) >= x.installmentNumber;
-      } else {
-        isPaid = x.is_paid === true;
-      }
-      if (isPaid) paid += amt;
-    }
-  });
-  income  = Math.round(income * 100) / 100;
-  expense = Math.round(expense * 100) / 100;
-  paid    = Math.round(paid * 100) / 100;
-
-  var balance = Math.round((income - expense) * 100) / 100;
-
-  incEl.textContent = money(income);
-  expEl.textContent = money(expense);
-  if (paidEl) paidEl.textContent = money(paid);
+  incEl.textContent = money(totals.income);
+  expEl.textContent = money(totals.expense);
+  if (paidEl) paidEl.textContent = money(totals.paid);
   if (balEl) {
-    balEl.textContent = money(balance);
+    balEl.textContent = money(totals.balance);
     var balCard = balEl.closest(".tx-sum-card");
     if (balCard) {
-      balCard.classList.toggle("tx-sum-balance-neg", balance < 0);
+      balCard.classList.toggle("tx-sum-balance-neg", totals.balance < 0);
     }
   }
 
