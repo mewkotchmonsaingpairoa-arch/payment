@@ -572,28 +572,35 @@ function renderTxSummary(filteredList) {
   var targetList = filteredList || allList;
   var incEl  = _id("tx-sum-income");
   var expEl  = _id("tx-sum-expense");
+  var paidEl = _id("tx-sum-paid");
   var balEl  = _id("tx-sum-balance");
   var cntEl  = _id("tx-sum-count");
   if (!incEl) return;
 
-  var income = 0, expense = 0;
+  var income = 0, expense = 0, paid = 0;
   targetList.forEach(function(x) {
     var amt = Number(x.amount) || 0;
     if (x.type === "income")  income += amt;
-    if (x.type === "expense") expense += amt;
+    if (x.type === "expense") {
+      expense += amt;
+      var isPaid = false;
+      if (x.source === "installment") {
+        isPaid = paidInstallments(x.installment) >= x.installmentNumber;
+      } else {
+        isPaid = x.is_paid === true;
+      }
+      if (isPaid) paid += amt;
+    }
   });
-  income = Math.round(income * 100) / 100;
+  income  = Math.round(income * 100) / 100;
   expense = Math.round(expense * 100) / 100;
-  var balance = Math.round((income - expense) * 100) / 100;
+  paid    = Math.round(paid * 100) / 100;
 
   incEl.textContent = money(income);
   expEl.textContent = money(expense);
-  balEl.textContent = money(balance);
-  // Highlight balance card color
-  var balCard = balEl.closest(".tx-sum-card");
-  if (balCard) {
-    balCard.classList.toggle("tx-sum-balance-neg", balance < 0);
-  }
+  if (paidEl) paidEl.textContent = money(paid);
+  if (balEl)  balEl.textContent  = money(Math.round((income - expense) * 100) / 100);
+
   cntEl.textContent = (txFilter === "all" || targetList.length === allList.length)
     ? allList.length + " รายการ"
     : targetList.length + " / " + allList.length + " รายการ";

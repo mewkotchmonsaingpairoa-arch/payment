@@ -309,9 +309,9 @@ body::before { animation: sparkle-drift 6s ease-in-out infinite; } body::after {
 .tx-sum-expense .tx-sum-icon { background: linear-gradient(135deg, #ffd6e3, #ffb3c8); color: #c4547a; }
 .tx-sum-expense strong { color: #c0506e; }
 
-.tx-sum-balance { background: linear-gradient(135deg, #f6f0ff, #ede3ff); border-color: #d8c8f0; box-shadow: 4px 5px 0 #d4c4e8, 0 6px 18px #bea8e01a; }
-.tx-sum-balance .tx-sum-icon { background: linear-gradient(135deg, #ddd0ff, #c5b0f5); color: #7857c2; }
-.tx-sum-balance strong { color: #6e4fc0; }
+.tx-sum-paid, .tx-sum-balance { background: linear-gradient(135deg, #f6f0ff, #ede3ff); border-color: #d8c8f0; box-shadow: 4px 5px 0 #d4c4e8, 0 6px 18px #bea8e01a; }
+.tx-sum-paid .tx-sum-icon, .tx-sum-balance .tx-sum-icon { background: linear-gradient(135deg, #ddd0ff, #c5b0f5); color: #7857c2; }
+.tx-sum-paid strong, .tx-sum-balance strong { color: #6e4fc0; }
 
 .tx-sum-balance-neg { background: linear-gradient(135deg, #fff3f0, #ffe8e3) !important; border-color: #f0c8bc !important; box-shadow: 4px 5px 0 #e8c0b4, 0 6px 18px #e0a08a1a !important; }
 .tx-sum-balance-neg .tx-sum-icon { background: linear-gradient(135deg, #ffd0c4, #ffb0a0) !important; color: #c44830 !important; }
