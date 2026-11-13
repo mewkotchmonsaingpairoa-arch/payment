@@ -273,33 +273,34 @@ body::before { animation: sparkle-drift 6s ease-in-out infinite; } body::after {
 /* ─── Transactions page: Summary strip ─────────────────────── */
 .tx-summary-strip {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
   margin-bottom: 18px;
 }
 .tx-sum-card {
   display: flex;
   align-items: center;
-  gap: 13px;
-  padding: 16px 18px;
+  gap: 11px;
+  padding: 14px 15px;
   border-radius: 18px;
   background: #fffafd;
   border: 1.5px solid #f0dce9;
   box-shadow: 4px 5px 0 #efd1e1, 0 6px 18px #dcacd41a;
   transition: transform .18s ease, box-shadow .18s ease;
+  min-width: 0;
 }
 .tx-sum-card:hover { transform: translate(-2px, -3px); box-shadow: 6px 8px 0 #efd1e1, 0 10px 22px #dcacd42a; }
 .tx-sum-icon {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 13px;
-  font-size: 20px;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  font-size: 18px;
   flex: 0 0 auto;
 }
 .tx-sum-card span { display: block; font-size: 10px; font-weight: 700; color: #a0849e; margin-bottom: 3px; }
-.tx-sum-card strong { display: block; font-size: 19px; letter-spacing: -.4px; color: #684562; }
+.tx-sum-card strong { display: block; font-size: 17px; letter-spacing: -.4px; color: #684562; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .tx-sum-income { background: linear-gradient(135deg, #f3fff8, #e8fbf1); border-color: #c4ecd8; box-shadow: 4px 5px 0 #cde9da, 0 6px 18px #9ed6bc1a; }
 .tx-sum-income .tx-sum-icon { background: linear-gradient(135deg, #d2f5e6, #a8e8cc); color: #2d9e6f; }
@@ -309,9 +310,13 @@ body::before { animation: sparkle-drift 6s ease-in-out infinite; } body::after {
 .tx-sum-expense .tx-sum-icon { background: linear-gradient(135deg, #ffd6e3, #ffb3c8); color: #c4547a; }
 .tx-sum-expense strong { color: #c0506e; }
 
-.tx-sum-paid, .tx-sum-balance { background: linear-gradient(135deg, #f6f0ff, #ede3ff); border-color: #d8c8f0; box-shadow: 4px 5px 0 #d4c4e8, 0 6px 18px #bea8e01a; }
-.tx-sum-paid .tx-sum-icon, .tx-sum-balance .tx-sum-icon { background: linear-gradient(135deg, #ddd0ff, #c5b0f5); color: #7857c2; }
-.tx-sum-paid strong, .tx-sum-balance strong { color: #6e4fc0; }
+.tx-sum-paid { background: linear-gradient(135deg, #f0f7ff, #e4f0fc); border-color: #c2dcf5; box-shadow: 4px 5px 0 #bbd4ee, 0 6px 18px #a8cce81a; }
+.tx-sum-paid .tx-sum-icon { background: linear-gradient(135deg, #d2e8fc, #b4d8fa); color: #2772b8; }
+.tx-sum-paid strong { color: #2064a4; }
+
+.tx-sum-balance { background: linear-gradient(135deg, #f6f0ff, #ede3ff); border-color: #d8c8f0; box-shadow: 4px 5px 0 #d4c4e8, 0 6px 18px #bea8e01a; }
+.tx-sum-balance .tx-sum-icon { background: linear-gradient(135deg, #ddd0ff, #c5b0f5); color: #7857c2; }
+.tx-sum-balance strong { color: #6e4fc0; }
 
 .tx-sum-balance-neg { background: linear-gradient(135deg, #fff3f0, #ffe8e3) !important; border-color: #f0c8bc !important; box-shadow: 4px 5px 0 #e8c0b4, 0 6px 18px #e0a08a1a !important; }
 .tx-sum-balance-neg .tx-sum-icon { background: linear-gradient(135deg, #ffd0c4, #ffb0a0) !important; color: #c44830 !important; }
@@ -321,12 +326,13 @@ body::before { animation: sparkle-drift 6s ease-in-out infinite; } body::after {
 .tx-sum-count .tx-sum-icon { background: linear-gradient(135deg, #ffddb8, #ffc890); color: #b86820; }
 .tx-sum-count strong { color: #a86018; }
 
-@media (max-width: 900px) { .tx-summary-strip { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 620px) {
+@media (max-width: 1100px) { .tx-summary-strip { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 720px) {
   .tx-summary-strip { grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 14px; }
   .tx-sum-card { padding: 12px 13px; gap: 10px; }
   .tx-sum-card strong { font-size: 15px; }
   .tx-sum-icon { width: 34px; height: 34px; font-size: 16px; border-radius: 10px; }
+  .tx-sum-card.tx-sum-count { grid-column: span 2; }
 }
 
 /* ─── Sidebar manage-categories button ─────────────────────── */

@@ -596,10 +596,18 @@ function renderTxSummary(filteredList) {
   expense = Math.round(expense * 100) / 100;
   paid    = Math.round(paid * 100) / 100;
 
+  var balance = Math.round((income - expense) * 100) / 100;
+
   incEl.textContent = money(income);
   expEl.textContent = money(expense);
   if (paidEl) paidEl.textContent = money(paid);
-  if (balEl)  balEl.textContent  = money(Math.round((income - expense) * 100) / 100);
+  if (balEl) {
+    balEl.textContent = money(balance);
+    var balCard = balEl.closest(".tx-sum-card");
+    if (balCard) {
+      balCard.classList.toggle("tx-sum-balance-neg", balance < 0);
+    }
+  }
 
   cntEl.textContent = (txFilter === "all" || targetList.length === allList.length)
     ? allList.length + " รายการ"
